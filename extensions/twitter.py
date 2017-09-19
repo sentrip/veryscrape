@@ -1,28 +1,11 @@
 import asyncio
 import json
-import os
 import re
 import time
 from contextlib import suppress
 
-from scrapesync.base import AsyncOAuth
-from scrapesync.base import Item
-
-
-def load_authentications(base_directory, query_dictionary):
-    """
-    Loads twitter api keys from file
-    Note - only 2 streams can be set up per api-key/proxy combination (see Twitter Streaming ToS)
-    """
-    authentications = {}
-    with open(os.path.join(base_directory, 'lib', 'api', 'twitter.txt'), 'r') as f:
-        api_keys = [i.split('|') for i in f.read().splitlines()]
-        ind = 0
-        for i, query_topic in enumerate(query_dictionary):
-            if i % 2 == 0:
-                ind = int(i / 2)
-            authentications[query_topic] = api_keys[ind]
-    return authentications
+from base import AsyncOAuth
+from base import Item
 
 
 async def async_stream_read_loop(parent, stream, topic, chunk_size=1024):

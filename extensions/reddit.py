@@ -1,22 +1,11 @@
 import asyncio
-import os
 import time
 from collections import defaultdict
 from urllib.parse import urlencode
 
 import aiohttp
-from scrapesync.base import Item
 
-
-def load_authentications(base_directory, query_dictionary):
-    """Load reddit api keys and user agent strings from file"""
-    api_keys = {}
-    with open(os.path.join(base_directory, 'lib', 'api', 'reddit.txt'), 'r') as f:
-        data = f.read().splitlines()
-        for i, topic in enumerate(query_dictionary):
-            # client_id, secret
-            api_keys[topic] = data[i].split('|')
-    return api_keys
+from base import Item
 
 
 async def new_session(key, secret):

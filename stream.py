@@ -3,9 +3,9 @@ import os
 from multiprocessing import Process
 from multiprocessing.connection import Listener
 
-from scrapesync.base import load_query_dictionary, BASE_DIR
-from scrapesync.extensions.reddit import reddit, load_authentications as lra
-from scrapesync.extensions.twitter import twitter, load_authentications as lta
+from base import load_authentications, load_query_dictionary, BASE_DIR
+from extensions.reddit import reddit
+from extensions.twitter import twitter
 
 
 class StreamWorker(Process):
@@ -18,9 +18,11 @@ class StreamWorker(Process):
         # General
         self.topics = load_query_dictionary(os.path.join(BASE_DIR, 'lib', 'documents', 'query_topics1.txt'))
         # Twitter
-        self.twitter_authentications = lta(BASE_DIR, self.topics)
+        self.twitter_authentications = load_authentications(os.path.join(BASE_DIR, 'lib', 'api', 'twitter.txt'),
+                                                            self.topics)
         # Reddit
-        self.reddit_authentications = lra(BASE_DIR, self.topics)
+        self.reddit_authentications = load_authentications(os.path.join(BASE_DIR, 'lib', 'api', 'reddit.txt'),
+                                                           self.topics)
         self.subreddits = load_query_dictionary(os.path.join(BASE_DIR, 'lib', 'documents', 'subreddits1.txt'))
         # Rate limits
         self.reddit_rate_limit = {k: 60 for k in self.topics}

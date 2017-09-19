@@ -23,6 +23,16 @@ def load_query_dictionary(file_name):
     return queries
 
 
+def load_authentications(file_name, query_dictionary):
+    """Load api keys seperated by '|' from file"""
+    api_keys = {}
+    with open(file_name, 'r') as f:
+        data = f.read().splitlines()
+        for i, topic in enumerate(query_dictionary):
+            api_keys[topic] = data[i].split('|')
+    return api_keys
+
+
 class AsyncOAuth(aioauth_client.Client):
     access_token_key = 'oauth_token'
     request_token_url = None
