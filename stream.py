@@ -12,7 +12,7 @@ class StreamWorker(Process):
     def __init__(self, port=6000):
         super(StreamWorker, self).__init__()
         self.base_dir = BASE_DIR
-        self.listener = Listener(('localhost', port), authkey=b'veryscrape')
+        self.port = port
         self.outgoing = None
         self.running = True
         # General
@@ -47,7 +47,8 @@ class StreamWorker(Process):
             await asyncio.gather(*[asyncio.ensure_future(j) for j in jobs])
 
     def run(self):
-        self.outgoing = self.listener.accept()
+        listener = Listener(('localhost', self.port), authkey=b'veryscrape')
+        self.outgoing = listener.accept()
         jobs = self.initialize_work()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

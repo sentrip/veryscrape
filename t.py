@@ -1,7 +1,7 @@
-from scrapesync.stream import StreamWorker
+from stream import StreamWorker
 
 
-
-s = StreamWorker()
-s.start()
+if __name__ == '__main__':
+    s = StreamWorker()
+    s.start()
 
