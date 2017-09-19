@@ -9,8 +9,8 @@ import aioauth_client
 import aiohttp
 
 random = SystemRandom().random
-BASE_DIR = "/home/djordje/Sentrip/"
-#BASE_DIR = "C:/users/djordje/desktop"
+#BASE_DIR = "/home/djordje/Sentrip/"
+BASE_DIR = "C:/users/djordje/desktop"
 
 
 def load_query_dictionary(file_name):
@@ -95,7 +95,7 @@ class Producer(Process):
     def __init__(self, port):
         super(Producer, self).__init__()
         self.outgoing = None
-        self.listener = Listener(('localhost', port), authkey=b'veryscrape')
+        self.port = port
         self.running = True
 
     def initialize_work(self):
@@ -110,7 +110,8 @@ class Producer(Process):
             await asyncio.gather(*[asyncio.ensure_future(j) for j in jobs])
 
     def run(self):
-        self.outgoing = self.listener.accept()
+        listener = Listener(('localhost', self.port), authkey=b'veryscrape')
+        self.outgoing = listener.accept()
         jobs = self.initialize_work()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

@@ -1,24 +1,18 @@
-import asyncio
 import os
-from multiprocessing import Process
-from multiprocessing.connection import Listener
+from multiprocessing import Queue
 
-from base import load_authentications, load_query_dictionary, BASE_DIR
+from base import load_authentications, load_query_dictionary, BASE_DIR, Producer
 from extensions.reddit import reddit
 from extensions.twingly import twingly
 from extensions.twitter import twitter
 
 
-class StreamWorker(Process):
+class StreamWorker(Producer):
     def __init__(self, port=6000):
-        super(StreamWorker, self).__init__()
-        self.base_dir = BASE_DIR
-        self.port = port
-        self.outgoing = None
-        self.running = True
+        super(StreamWorker, self).__init__(port)
         # General
         self.topics = load_query_dictionary(os.path.join(BASE_DIR, 'lib', 'documents', 'query_topics1.txt'))
-        self.url_queue = asyncio.Queue()
+        self.url_queue = Queue()
         # Twitter
         self.twitter_authentications = load_authentications(os.path.join(BASE_DIR, 'lib', 'api', 'twitter.txt'),
                                                             self.topics)
@@ -40,19 +34,3 @@ class StreamWorker(Process):
             for query in self.subreddits[topic]:
                 jobs.append(reddit(self, topic, query))
         return jobs
-
-    async def send(self, item):
-        self.outgoing.send(item)
-        await asyncio.sleep(0)
-
-    async def serve(self, jobs):
-        while self.running:
-            await asyncio.gather(*[asyncio.ensure_future(j) for j in jobs])
-
-    def run(self):
-        listener = Listener(('localhost', self.port), authkey=b'veryscrape')
-        self.outgoing = listener.accept()
-        jobs = self.initialize_work()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.serve(jobs))
