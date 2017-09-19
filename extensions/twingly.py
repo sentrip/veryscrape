@@ -39,7 +39,7 @@ class TwinglyClient:
     async def execute_query(self, q):
         """Executes the given search query and returns the result"""
         query_string = q + " lang:en" + ' tspan:12h page-size:10000'
-        query_url = "%s?%s" % (self.API_URL, urlencode({'q': query_string, 'apiKey': self.api_key}))
+        query_url = "%s?%s" % (self.API_URL, urlencode({'q': query_string, 'apikey': self.api_key}))
         async with self.session.get(query_url) as response:  # proxy=self.proxy
             raw = await response.text()
         result = self.parser.parse(raw)
