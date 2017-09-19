@@ -1,7 +1,7 @@
 import os
 from multiprocessing import Queue
 
-from base import load_authentications, load_query_dictionary, BASE_DIR, Producer
+from base import BASE_DIR, load_authentications, load_query_dictionary, download, Producer
 from extensions.google import google
 from extensions.reddit import reddit
 from extensions.twingly import twingly
@@ -25,7 +25,7 @@ class StreamWorker(Producer):
         self.reddit_rate_limit = {k: 60 for k in self.topics}
 
     def initialize_work(self):
-        jobs = []
+        jobs = [download(self)]
         for topic in self.topics:
             for query in self.topics[topic]:
                 jobs.append(twitter(self, topic, query))

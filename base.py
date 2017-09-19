@@ -7,6 +7,7 @@ from random import SystemRandom
 
 import aioauth_client
 import aiohttp
+from fake_useragent import UserAgent
 
 random = SystemRandom().random
 BASE_DIR = "/home/djordje/Sentrip/"
@@ -32,6 +33,22 @@ def load_authentications(file_name, query_dictionary):
         for i, topic in enumerate(query_dictionary):
             api_keys[topic] = data[i].split('|')
     return api_keys
+
+
+async def download(parent):
+    """Async downloading of html text from article urls"""
+    fake_users = UserAgent()
+    sess = aiohttp.ClientSession()
+
+    while parent.running:
+        if not parent.url_queue.empty():
+            item = parent.url_queue.get_nowait()
+            async with sess.get(item.content, headers={'user-agent': fake_users.random}) as response:
+                html_content = await response.text()
+                await parent.send(Item(str(html_content), item.topic, item.source))
+        else:
+            await asyncio.sleep(0)
+    sess.close()
 
 
 class AsyncOAuth(aioauth_client.Client):
