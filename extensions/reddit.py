@@ -47,7 +47,7 @@ async def reddit(parent, topic, query):
     link_last_id = None
     start_time = time.time()
     sess, expiry_time = await new_session(*parent.reddit_authentications[topic])   
-    while True:
+    while parent.running:
         try:
             params = {}
             if link_last_id:

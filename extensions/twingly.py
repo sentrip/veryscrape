@@ -1,15 +1,11 @@
 # Class for streaming blog texts from twingly search
-import aiohttp
 import asyncio
-import datetime
 import os
 import time
 from collections import deque
-from pytz import utc
-from queue import Queue
-from threading import Thread
 from urllib.parse import urlencode
 
+import aiohttp
 from twingly_search import parser
 
 from base import BASE_DIR, Item
@@ -60,9 +56,7 @@ async def twingly(parent, topic, query, search_every=15*60):
 
     while parent.running:
         try:
-            print('trying')
             result = await client.execute_query(query)
-            print(result.posts)
             for post in result.posts:
                 # Remove any useless urls
                 is_root_url = any(post.url.endswith(i) for i in bad_domains)
@@ -70,9 +64,9 @@ async def twingly(parent, topic, query, search_every=15*60):
                 if not (is_root_url or is_not_relevant) and post.url not in seen_urls:
                     new_item = Item(content=post.url, topic=topic, source='blog')
                     seen_urls.append(post.url)
-                    parent.url_queue.put(new_item)
+                    await parent.url_queue.put(new_item)
             await asyncio.sleep(search_every)
-            print('done')
+
         except Exception as e:
             print('Twingly', repr(e))
             await asyncio.sleep(retry_time)
