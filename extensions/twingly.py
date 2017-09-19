@@ -38,32 +38,37 @@ class TwinglyClient:
 
     async def execute_query(self, q):
         """Executes the given search query and returns the result"""
+        bad_domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
+        false_urls = {'google.', 'youtube.'}
         query_string = q + " lang:en" + ' tspan:12h page-size:10000'
         query_url = "%s?%s" % (self.API_URL, urlencode({'q': query_string, 'apikey': self.api_key}))
         async with self.session.get(query_url) as response:  # proxy=self.proxy
             raw = await response.text()
         result = self.parser.parse(raw)
-        return result
+        scraped_urls = set()
+        for post in result.posts:
+            # Remove any useless urls
+            is_root_url = any(post.url.endswith(i) for i in bad_domains)
+            is_not_relevant = any(i in post.url for i in false_urls)
+            if not (is_root_url or is_not_relevant):
+                scraped_urls.add(post.url)
+        return scraped_urls
 
 async def twingly(parent, topic, query, search_every=15*60):
-    bad_domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
-    false_urls = {'google.', 'youtube.'}
     retry_time = 10.0
     api_key = load_authentications(os.path.join(BASE_DIR, 'lib', 'api', 'twingly.txt'))
     client = TwinglyClient(api_key, None)
     seen_urls = deque(maxlen=100000)
-    start_time = time.time()
+    expiry_time = time.time()
 
     while parent.running:
         try:
-            result = await client.execute_query(query)
-            for post in result.posts:
-                # Remove any useless urls
-                is_root_url = any(post.url.endswith(i) for i in bad_domains)
-                is_not_relevant = any(i in post.url for i in false_urls)
-                if not (is_root_url or is_not_relevant) and post.url not in seen_urls:
-                    new_item = Item(content=post.url, topic=topic, source='blog')
-                    seen_urls.append(post.url)
+            results = await client.execute_query(query)
+
+            for url in results:
+                if url not in seen_urls:
+                    new_item = Item(content=url, topic=topic, source='blog')
+                    seen_urls.append(url)
                     parent.url_queue.put(new_item)
             await asyncio.sleep(search_every)
 
@@ -72,7 +77,7 @@ async def twingly(parent, topic, query, search_every=15*60):
             await asyncio.sleep(retry_time)
             client = TwinglyClient(api_key, None)
 
-        if time.time() - start_time >= 3600:
+        if time.time() - expiry_time >= 3600:
             api_key = load_authentications(os.path.join(BASE_DIR, 'lib', 'api', 'twingly.txt'))
-            start_time = time.time()
+            expiry_time = time.time()
     client.session.close()
