@@ -64,7 +64,7 @@ async def twingly(parent, topic, query, search_every=15*60):
                 if not (is_root_url or is_not_relevant) and post.url not in seen_urls:
                     new_item = Item(content=post.url, topic=topic, source='blog')
                     seen_urls.append(post.url)
-                    await parent.url_queue.put(new_item)
+                    parent.url_queue.put(new_item)
             await asyncio.sleep(search_every)
 
         except Exception as e:
