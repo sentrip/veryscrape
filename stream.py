@@ -1,11 +1,12 @@
 import asyncio
 import os
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 from multiprocessing.connection import Listener
 
 from base import load_authentications, load_query_dictionary, BASE_DIR
 from extensions.reddit import reddit
 from extensions.twitter import twitter
+from extensions.twingly import twingly
 
 
 class StreamWorker(Process):
@@ -17,6 +18,7 @@ class StreamWorker(Process):
         self.running = True
         # General
         self.topics = load_query_dictionary(os.path.join(BASE_DIR, 'lib', 'documents', 'query_topics1.txt'))
+        self.url_queue = Queue()
         # Twitter
         self.twitter_authentications = load_authentications(os.path.join(BASE_DIR, 'lib', 'api', 'twitter.txt'),
                                                             self.topics)
@@ -34,6 +36,7 @@ class StreamWorker(Process):
         for topic in self.topics:
             for query in self.topics[topic]:
                 jobs.append(twitter(self, topic, query))
+                jobs.append(twingly(self, topic, query))
             for query in self.subreddits[topic]:
                 jobs.append(reddit(self, topic, query))
         return jobs

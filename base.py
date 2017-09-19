@@ -10,7 +10,7 @@ import aiohttp
 
 random = SystemRandom().random
 BASE_DIR = "/home/djordje/Sentrip/"
-#BASE_DIR = "C:/users/djordje/desktop/"
+#BASE_DIR = "C:/users/djordje/desktop"
 
 
 def load_query_dictionary(file_name):
