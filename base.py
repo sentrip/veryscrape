@@ -114,33 +114,6 @@ class Item:
 class Producer(Process):
     def __init__(self, port):
         super(Producer, self).__init__()
-        self.outgoing = None
-        self.port = port
-        self.running = True
-
-    def initialize_work(self):
-        return []
-
-    async def send(self, item):
-        self.outgoing.send(item)
-        await asyncio.sleep(0)
-
-    async def serve(self, jobs):
-        while self.running:
-            await asyncio.gather(*[asyncio.ensure_future(j) for j in jobs])
-
-    def run(self):
-        listener = Listener(('localhost', self.port), authkey=b'veryscrape')
-        self.outgoing = listener.accept()
-        jobs = self.initialize_work()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.serve(jobs))
-
-
-class Producer2(Process):
-    def __init__(self, port):
-        super(Producer2, self).__init__()
         self.result_queue = Queue()
         self.outgoing = None
         self.port = port
@@ -160,7 +133,6 @@ class Producer2(Process):
         listener = Listener(('localhost', self.port), authkey=b'veryscrape')
         self.outgoing = listener.accept()
         jobs = self.initialize_work()
-        loop = asyncio.get_event_loop()
         for set_of_jobs in jobs:
             if set_of_jobs:
                 Process(target=self.run_in_loop, args=(set_of_jobs,)).start()

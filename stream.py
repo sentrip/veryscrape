@@ -1,13 +1,13 @@
 import os
 from multiprocessing import Queue
 
-from base import BASE_DIR, load_authentications, load_query_dictionary, download, Producer2
+from base import BASE_DIR, load_authentications, load_query_dictionary, download, Producer
 from extensions.reddit import reddit
 from extensions.search import search
 from extensions.twitter import twitter
 
 
-class StreamWorker(Producer2):
+class StreamWorker(Producer):
     def __init__(self, port=6000):
         super(StreamWorker, self).__init__(port)
         # General
