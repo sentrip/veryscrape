@@ -1,57 +1,36 @@
 import asyncio
+import os
 import time
 from hashlib import sha1
 from multiprocessing import Process, Queue
 from multiprocessing.connection import Listener
 from random import SystemRandom
+from threading import Thread
 
 import aioauth_client
 import aiohttp
-from fake_useragent import UserAgent
 
 random = SystemRandom().random
 BASE_DIR = "/home/djordje/Sentrip/"
-#BASE_DIR = "C:/users/djordje/desktop"
+if not os.path.isdir(BASE_DIR):
+    BASE_DIR = "C:/users/djordje/desktop"
 
 
-def load_query_dictionary(file_name):
-    """Loads query topics and corresponding queries from disk"""
-    queries = {}
-    with open(file_name, 'r') as f:
-        lns = f.read().splitlines()
-        for l in lns:
-            x, y = l.split(':')
-            queries[x] = y.split(',')
-    return queries
+class Item:
+    """General container for text/numerical/vector data categorized by topic and source"""
+    def __init__(self, content='', topic='', source=''):
+        self.content = content
+        self.topic = topic
+        self.source = source
 
+    def __repr__(self):
+        return "Item({:5s}, {:7s}, {})".format(self.topic, self.source, str(self.content)[:10])
 
-def load_authentications(file_name, query_dictionary):
-    """Load api keys seperated by '|' from file"""
-    api_keys = {}
-    with open(file_name, 'r') as f:
-        data = f.read().splitlines()
-        for i, topic in enumerate(query_dictionary):
-            api_keys[topic] = data[i].split('|')
-    return api_keys
+    def __hash__(self):
+        return hash(str(self.content) + self.topic + self.source)
 
-
-async def download(parent):
-    """Async downloading of html text from article urls"""
-    fake_users = UserAgent()
-    sess = aiohttp.ClientSession()
-
-    while parent.running:
-        if not parent.url_queue.empty():
-            item = parent.url_queue.get_nowait()
-            try:
-                async with sess.get(item.content, headers={'user-agent': fake_users.random}) as response:
-                    html_content = await response.text()
-                    parent.result_queue.put(Item(str(html_content), item.topic, item.source))
-            except:
-                pass
-        else:
-            await asyncio.sleep(0)
-    sess.close()
+    def __eq__(self, other):
+        return self.topic == other.topic and self.source == other.source and self.content == other.content
 
 
 class AsyncOAuth(aioauth_client.Client):
@@ -94,21 +73,48 @@ class AsyncOAuth(aioauth_client.Client):
         self.sess.close()
 
 
-class Item:
-    """General container for text/numerical/vector data categorized by topic and source"""
-    def __init__(self, content='', topic='', source=''):
-        self.content = content
-        self.topic = topic
-        self.source = source
+class SearchClient:
+    def __init__(self, user_agent, proxy):
+        self.session = aiohttp.ClientSession(headers={'User-Agent': user_agent})
+        self.proxy = proxy
 
-    def __repr__(self):
-        return "Item({:5s}, {:7s}, {})".format(self.topic, self.source, str(self.content)[:10])
+    def build_query(self, q):
+        pass
 
-    def __hash__(self):
-        return hash(str(self.content) + self.topic + self.source)
+    def parse_raw_html(self, h):
+        pass
 
-    def __eq__(self, other):
-        return self.topic == other.topic and self.source == other.source and self.content == other.content
+    @staticmethod
+    def urls_generator(result):
+        yield result
+
+    @staticmethod
+    def clean_urls(urls):
+        domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
+        false_urls = {'google.', 'blogger.', 'youtube.', 'googlenewsblog.'}
+        for i in urls:
+            is_root_url = any(i.endswith(j) for j in domains)
+            is_not_relevant = any(j in i for j in false_urls)
+            if i.startswith('http') and not (is_root_url or is_not_relevant):
+                yield i
+
+    async def fetch_url(self, url):
+        async with self.session.get(url) as response:  # proxy=self.proxy
+            return await response.text()
+
+    async def execute_query(self, q):
+        """Executes the given search query and returns the result"""
+        query_url = self.build_query(q)
+        raw = await self.fetch_url(query_url)
+        scraped_urls = set()
+        try:
+            await asyncio.sleep(0)
+            for url in self.clean_urls(self.urls_generator(raw)):
+                scraped_urls.add(url)
+                await asyncio.sleep(0)
+        except Exception as e:
+            pass
+        return scraped_urls
 
 
 class Producer(Process):
@@ -123,6 +129,27 @@ class Producer(Process):
         return []
 
     @staticmethod
+    def load_query_dictionary(file_name):
+        """Loads query topics and corresponding queries from disk"""
+        queries = {}
+        with open(os.path.join(BASE_DIR, 'lib', 'documents', file_name), 'r') as f:
+            lns = f.read().splitlines()
+            for l in lns:
+                x, y = l.split(':')
+                queries[x] = y.split(',')
+        return queries
+
+    @staticmethod
+    def load_authentications(file_name, query_dictionary):
+        """Load api keys seperated by '|' from file"""
+        api_keys = {}
+        with open(os.path.join(BASE_DIR, 'lib', 'api', file_name), 'r') as f:
+            data = f.read().splitlines()
+            for i, topic in enumerate(query_dictionary):
+                api_keys[topic] = data[i].split('|')
+        return api_keys
+
+    @staticmethod
     def run_in_loop(jobs):
         policy = asyncio.get_event_loop_policy()
         policy.set_event_loop(policy.new_event_loop())
@@ -135,6 +162,6 @@ class Producer(Process):
         jobs = self.initialize_work()
         for set_of_jobs in jobs:
             if set_of_jobs:
-                Process(target=self.run_in_loop, args=(set_of_jobs,)).start()
+                Thread(target=self.run_in_loop, args=(set_of_jobs,)).start()
         while self.running:
             self.outgoing.send(self.result_queue.get())
