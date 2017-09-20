@@ -1,14 +1,13 @@
 import os
 from multiprocessing import Queue
 
-from base import BASE_DIR, load_authentications, load_query_dictionary, download, Producer
-from extensions.google import google
+from base import BASE_DIR, load_authentications, load_query_dictionary, download, Producer2
 from extensions.reddit import reddit
-from extensions.twingly import twingly
+from extensions.search import search
 from extensions.twitter import twitter
 
 
-class StreamWorker(Producer):
+class StreamWorker(Producer2):
     def __init__(self, port=6000):
         super(StreamWorker, self).__init__(port)
         # General
@@ -25,11 +24,11 @@ class StreamWorker(Producer):
         self.reddit_rate_limit = {k: 60 for k in self.topics}
 
     def initialize_work(self):
-        jobs = [download(self)]
+        jobs = [[download(self)], [], [], []]
         for topic in self.topics:
-            jobs.append(twitter(self, topic))
-            jobs.append(twingly(self, topic))
-            jobs.append(google(self, topic))
             for query in self.subreddits[topic]:
-                jobs.append(reddit(self, topic, query))
+                jobs[1].append(reddit(self, topic, query))
+            for query in self.topics[topic]:
+                jobs[2].append(twitter(self, topic, query))
+                jobs[3].append(search(self, topic, query))
         return jobs

@@ -76,7 +76,7 @@ async def reddit(parent, topic, query):
 
                 for c, cid in zip(comments, ids):
                     if cid not in seen_comments:
-                        await parent.send(Item(c, topic, 'reddit'))
+                        parent.result_queue.put(Item(c, topic, 'reddit'))
                 seen_comments.update(set(ids))
 
                 now = time.time()

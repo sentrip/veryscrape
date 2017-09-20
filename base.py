@@ -1,7 +1,7 @@
 import asyncio
 import time
 from hashlib import sha1
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 from multiprocessing.connection import Listener
 from random import SystemRandom
 
@@ -46,7 +46,7 @@ async def download(parent):
             try:
                 async with sess.get(item.content, headers={'user-agent': fake_users.random}) as response:
                     html_content = await response.text()
-                    await parent.send(Item(str(html_content), item.topic, item.source))
+                    parent.result_queue.put(Item(str(html_content), item.topic, item.source))
             except:
                 pass
         else:
@@ -136,3 +136,33 @@ class Producer(Process):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self.serve(jobs))
+
+
+class Producer2(Process):
+    def __init__(self, port):
+        super(Producer2, self).__init__()
+        self.result_queue = Queue()
+        self.outgoing = None
+        self.port = port
+        self.running = True
+
+    def initialize_work(self):
+        return []
+
+    @staticmethod
+    def run_in_loop(jobs):
+        policy = asyncio.get_event_loop_policy()
+        policy.set_event_loop(policy.new_event_loop())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.gather(*jobs))
+
+    def run(self):
+        listener = Listener(('localhost', self.port), authkey=b'veryscrape')
+        self.outgoing = listener.accept()
+        jobs = self.initialize_work()
+        loop = asyncio.get_event_loop()
+        for set_of_jobs in jobs:
+            if set_of_jobs:
+                Process(target=self.run_in_loop, args=(set_of_jobs,)).start()
+        while self.running:
+            self.outgoing.send(self.result_queue.get())
