@@ -83,10 +83,10 @@ def feature_convert(item, vocab, document_length=30, sentence_length=30):
     return new_item
 
 
-class PreProcessStream(Process):
+class PreProcessWorker(Process):
     """Sentiment calculation thread, sends average sentiments per time period calculated for all incoming items"""
     def __init__(self, incoming_port=6000, outgoing_port=6001):
-        super(PreProcessStream, self).__init__()
+        super(PreProcessWorker, self).__init__()
         self.incoming_port, self.outgoing_port = incoming_port, outgoing_port
         self.vocab = load_vocab(BASE_DIR)
         self.clean_functions = {'reddit': clean_reddit_comment, 'twitter': clean_tweet,
@@ -100,7 +100,10 @@ class PreProcessStream(Process):
 
         while self.running:
             item = incoming.recv()
-            item = self.clean_functions[item.source](item)
-            item = clean_general(item)
-            item = feature_convert(item, self.vocab)
-            outgoing.send(item)
+            try:
+                item = self.clean_functions[item.source](item)
+                item = clean_general(item)
+                item = feature_convert(item, self.vocab)
+                outgoing.send(item)
+            except:
+                pass

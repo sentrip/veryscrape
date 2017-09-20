@@ -43,9 +43,12 @@ async def download(parent):
     while parent.running:
         if not parent.url_queue.empty():
             item = parent.url_queue.get_nowait()
-            async with sess.get(item.content, headers={'user-agent': fake_users.random}) as response:
-                html_content = await response.text()
-                await parent.send(Item(str(html_content), item.topic, item.source))
+            try:
+                async with sess.get(item.content, headers={'user-agent': fake_users.random}) as response:
+                    html_content = await response.text()
+                    await parent.send(Item(str(html_content), item.topic, item.source))
+            except:
+                pass
         else:
             await asyncio.sleep(0)
     sess.close()

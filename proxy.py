@@ -82,7 +82,7 @@ class ProxySnatcher(Thread):
                         for t in self.proxies:
                             if proxy not in self.proxies[t]:
                                 heapq.heappush(self.proxies[t], proxy)
-            await asyncio.sleep(0.1*10)
+            await asyncio.sleep(0.1)
 
     def run(self):
         loop = asyncio.new_event_loop()
