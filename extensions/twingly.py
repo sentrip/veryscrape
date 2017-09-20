@@ -54,7 +54,7 @@ class TwinglyClient:
                 scraped_urls.add(post.url)
         return scraped_urls
 
-async def twingly(parent, topic, query, search_every=15*60):
+async def twingly(parent, topic, search_every=15*60):
     retry_time = 10.0
     api_key = load_authentications(os.path.join(BASE_DIR, 'lib', 'api', 'twingly.txt'))
     client = TwinglyClient(api_key, None)
@@ -62,20 +62,21 @@ async def twingly(parent, topic, query, search_every=15*60):
     expiry_time = time.time()
 
     while parent.running:
-        try:
-            results = await client.execute_query(query)
+        for query in parent.topics[topic]:
+            try:
+                results = await client.execute_query(query)
 
-            for url in results:
-                if url not in seen_urls:
-                    new_item = Item(content=url, topic=topic, source='blog')
-                    seen_urls.append(url)
-                    parent.url_queue.put(new_item)
-            await asyncio.sleep(search_every)
+                for url in results:
+                    if url not in seen_urls:
+                        new_item = Item(content=url, topic=topic, source='blog')
+                        seen_urls.append(url)
+                        parent.url_queue.put(new_item)
+                await asyncio.sleep(search_every)
 
-        except Exception as e:
-            print('Twingly', repr(e))
-            await asyncio.sleep(retry_time)
-            client = TwinglyClient(api_key, None)
+            except Exception as e:
+                print('Twingly', repr(e))
+                await asyncio.sleep(retry_time)
+                client = TwinglyClient(api_key, None)
 
         if time.time() - expiry_time >= 3600:
             api_key = load_authentications(os.path.join(BASE_DIR, 'lib', 'api', 'twingly.txt'))

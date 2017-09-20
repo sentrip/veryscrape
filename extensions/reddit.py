@@ -12,7 +12,7 @@ async def new_session(key, secret):
     token_url = 'https://www.reddit.com/api/v1/access_token'
     async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(key, secret), headers={'user-agent': 'test app'}) as client:
         async with client.post(token_url, data={'grant_type': 'client_credentials'}) as response:
-                j = await response.json()
+            j = await response.json()
     return aiohttp.ClientSession(headers={'user-agent': 'test app',
                                           'Authorization': 'bearer ' + j['access_token']}), time.time() + 3598
 
@@ -46,7 +46,7 @@ async def reddit(parent, topic, query):
     link_last_ids = defaultdict(int)
     link_last_id = None
     start_time = time.time()
-    sess, expiry_time = await new_session(*parent.reddit_authentications[topic])   
+    sess, expiry_time = await new_session(*parent.reddit_authentications[topic])
     while parent.running:
         try:
             params = {}
@@ -86,6 +86,4 @@ async def reddit(parent, topic, query):
                 if time.time() >= expiry_time:
                     sess, expiry_time = await new_session(*parent.reddit_authentications[topic])
         except Exception as e:
-            sess.close()
             print('Reddit', repr(e))
-

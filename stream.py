@@ -27,10 +27,9 @@ class StreamWorker(Producer):
     def initialize_work(self):
         jobs = [download(self)]
         for topic in self.topics:
-            for query in self.topics[topic]:
-                jobs.append(twitter(self, topic, query))
-                jobs.append(twingly(self, topic, query))
-                jobs.append(google(self, topic, query))
+            jobs.append(twitter(self, topic))
+            jobs.append(twingly(self, topic))
+            jobs.append(google(self, topic))
             for query in self.subreddits[topic]:
                 jobs.append(reddit(self, topic, query))
         return jobs

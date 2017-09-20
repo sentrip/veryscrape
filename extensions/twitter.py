@@ -35,7 +35,7 @@ async def async_stream_read_loop(parent, stream, topic, chunk_size=1024):
                     await parent.send(Item(s['text'], topic, 'twitter'))
 
 
-async def twitter(parent, topic, query):
+async def twitter(parent, topic):
     """Asynchronous twitter stream - streams tweets for provided query, topic is used for categorization"""
     retry_time_start = 5.0
     retry_420_start = 60.0
@@ -44,29 +44,31 @@ async def twitter(parent, topic, query):
     snooze_time_cap = 16
     retry_time = retry_time_start
     snooze_time = snooze_time_step
-    p = {'track': query, 'language': 'en'}
     auth = parent.twitter_authentications[topic]
     client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
+    p = {'language': 'en'}
     while parent.running:
-        # get proxy
-        try:
-            stream = await client.request('POST', 'statuses/filter.json', params=p)
-        except Exception as e:
-            print('Twitter', repr(e))
-            await asyncio.sleep(retry_time * 2)
-            client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
-            continue
+        for query in parent.topics[topic]:
+            # get proxy
+            p.update({'track': query})
+            try:
+                stream = await client.request('POST', 'statuses/filter.json', params=p)
+            except Exception as e:
+                print('Twitter', repr(e))
+                await asyncio.sleep(retry_time * 2)
+                client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
+                continue
 
-        if stream.status != 200:
-            if stream.status == 420:
-                retry_time = max(retry_420_start, retry_time)
-            await asyncio.sleep(retry_time)
-            retry_time = min(retry_time * 2., retry_time_cap)
-        else:
-            retry_time = retry_time_start
-            snooze_time = snooze_time_step
-            await async_stream_read_loop(parent, stream, topic)
+            if stream.status != 200:
+                if stream.status == 420:
+                    retry_time = max(retry_420_start, retry_time)
+                await asyncio.sleep(retry_time)
+                retry_time = min(retry_time * 2., retry_time_cap)
+            else:
+                retry_time = retry_time_start
+                snooze_time = snooze_time_step
+                await async_stream_read_loop(parent, stream, topic)
 
-        await asyncio.sleep(snooze_time)
-        snooze_time = min(snooze_time + snooze_time_step, snooze_time_cap)
+            await asyncio.sleep(snooze_time)
+            snooze_time = min(snooze_time + snooze_time_step, snooze_time_cap)
     client.close()

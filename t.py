@@ -18,5 +18,6 @@ if __name__ == '__main__':
     c = Client(('localhost', 6002), authkey=b'veryscrape')
     t = time.time()
     while True:
-        print(c.recv(), '{:.2f}'.format(time.time()-t))
+        i = c.recv()
+        print(i, '{:.2f}'.format(time.time()-t))
         t = time.time()

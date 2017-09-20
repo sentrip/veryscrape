@@ -39,23 +39,24 @@ class GoogleClient:
         return scraped_urls
 
 
-async def google(parent, topic, query, search_every=15*60):
+async def google(parent, topic, search_every=15*60):
     fake_users = UserAgent()
     retry_time = 10.0
     client = GoogleClient(fake_users.random, None)
     seen_urls = deque(maxlen=100000)
 
     while parent.running:
-        try:
-            results = await client.execute_query(query)
-            for url in results:
-                if url not in seen_urls:
-                    new_item = Item(content=url, topic=topic, source='article')
-                    seen_urls.append(url)
-                    parent.url_queue.put(new_item)
-            await asyncio.sleep(search_every)
+        for query in parent.topics[topic]:
+            try:
+                results = await client.execute_query(query)
+                for url in results:
+                    if url not in seen_urls:
+                        new_item = Item(content=url, topic=topic, source='article')
+                        seen_urls.append(url)
+                        parent.url_queue.put(new_item)
+                await asyncio.sleep(search_every)
 
-        except Exception as e:
-            print('Google', repr(e))
-            await asyncio.sleep(retry_time)
-            client = GoogleClient(fake_users.random, None)
+            except Exception as e:
+                print('Google', repr(e))
+                await asyncio.sleep(retry_time)
+                client = GoogleClient(fake_users.random, None)
