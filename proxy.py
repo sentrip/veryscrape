@@ -19,11 +19,11 @@ class ProxySnatcher(Thread):
     'uptime', 'port', 'allowsHttps', 'lastTested', 'allowsUserAgentHeader'"""
     def __init__(self, proxies_required=10, **params):
         super(ProxySnatcher, self).__init__()
+        self.proxies_required = proxies_required
         with open(os.path.join(BASE_DIR, 'lib', 'api', 'proxy.txt'), 'r') as f:
             key = f.read()
         params.update({'apiKey': key})
         self.url = 'https://api.getproxylist.com/proxy?anonymity=high%20anonymity&' + urlencode(params)
-        self.proxies_required = proxies_required
         self.proxies = {'reddit': [], 'twitter': [], 'google': [], 'twingly': []}
         self.seen_proxies = deque(maxlen=proxies_required*10)
         self.running = True
