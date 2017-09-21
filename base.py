@@ -4,7 +4,7 @@ import time
 from hashlib import sha1
 from multiprocessing import Process, Queue
 from multiprocessing.connection import Listener
-from random import SystemRandom
+from random import SystemRandom, shuffle
 from threading import Thread
 
 import aioauth_client
@@ -118,11 +118,12 @@ class SearchClient:
 
 
 class Producer(Process):
-    def __init__(self, port):
+    def __init__(self, port, use_processes=True):
         super(Producer, self).__init__()
         self.result_queue = Queue()
         self.outgoing = None
         self.port = port
+        self.W = Process if use_processes else Thread
         self.running = True
 
     def initialize_work(self):
@@ -162,6 +163,7 @@ class Producer(Process):
         jobs = self.initialize_work()
         for set_of_jobs in jobs:
             if set_of_jobs:
-                Thread(target=self.run_in_loop, args=(set_of_jobs,)).start()
+                shuffle(set_of_jobs)
+                self.W(target=self.run_in_loop, args=(set_of_jobs,)).start()
         while self.running:
             self.outgoing.send(self.result_queue.get())
