@@ -3,12 +3,14 @@ from multiprocessing.connection import Client
 
 # from preprocess import PreProcessWorker
 # from sentimentprocess import SentimentWorker
-from stream import StreamWorker
+from extensions.finance import FinanceWorker
 
 if __name__ == '__main__':
-    s = StreamWorker(use_processes=False)
-    s.start()
-    time.sleep(1)
+    f = FinanceWorker(send_every=10)
+    f.start()
+    # s = StreamWorker(use_processes=False)
+    # s.start()
+    # time.sleep(1)
     # p = PreProcessWorker()
     # p.start()
     # time.sleep(1)
@@ -18,7 +20,7 @@ if __name__ == '__main__':
     # l = deque()
     # for _ in range(2*len(s.topics)+1):
     #     l.append(Item())
-    c = Client(('localhost', 6002), authkey=b'veryscrape')
+    c = Client(('localhost', 6009), authkey=b'veryscrape')
     t = time.time()
     while True:
         i = c.recv()

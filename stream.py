@@ -14,8 +14,6 @@ from extensions.twitter import twitter
 class StreamWorker(Producer):
     def __init__(self, port=6000, use_processes=True):
         super(StreamWorker, self).__init__(port, use_processes)
-        # General
-        self.topics = self.load_query_dictionary('query_topics1.txt')
         self.url_queue = Queue()
         # Twitter
         self.twitter_authentications = self.load_authentications('twitter.txt', self.topics)
