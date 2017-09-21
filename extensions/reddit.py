@@ -8,82 +8,108 @@ import aiohttp
 from base import Item
 
 
-async def new_session(key, secret):
-    token_url = 'https://www.reddit.com/api/v1/access_token'
-    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(key, secret), headers={'user-agent': 'test app'}) as client:
-        async with client.post(token_url, data={'grant_type': 'client_credentials'}) as response:
-            j = await response.json()
-    return aiohttp.ClientSession(headers={'user-agent': 'test app',
-                                          'Authorization': 'bearer ' + j['access_token']}), time.time() + 3598
+class AsyncCommentStream:
+    BASE = 'https://oauth.reddit.com/r/'
+    TOKEN_URL = 'https://www.reddit.com/api/v1/access_token'
 
+    def __init__(self, auth, topic, queries, queue):
+        self.auth = auth
+        self.topic = topic
+        self.queries = queries
+        self.queue = queue
 
-async def links_from_subreddit(sess, subreddit, **params):
-    req_url = 'https://oauth.reddit.com/r/{}/hot.json?{}&raw_json=1&limit=30'.format(subreddit, urlencode(params))
-    async with sess.get(req_url) as response:
-        j = await response.json()
-    try:
-        links = {i['data']['id']: i['data']['created_utc'] for i in j['data']['children']}
-        return links, j['data']['after']
-    except KeyError:
-        return {}, None
+        self.links = {q: {} for q in queries}
+        self.last_ids = {q: defaultdict(int) for q in queries}
+        self.last_id = {q: None for q in queries}
+        self.seen = {q: set() for q in queries}
+        self.infinite_queries = iter(self.queries)
 
+        self.clock = time.time()
+        self.session = None
+        self.token = None
+        self.expiry_time = 0
+        self.rate_limit = 60
 
-async def comments_from_link(sess, subreddit, link_id, **params):
-    req_url = 'https://oauth.reddit.com/r/{}/comments/{}.json?{}&raw_json=1&limit=10000&depth=10'.format(subreddit, link_id, urlencode(params))
-    async with sess.get(req_url) as response:
-        j = await response.json()
-    comments, ids = [], []
-    for c in j[1]['data']['children']:
-        if c['kind'] == 't1':
-            comments.append(c['data']['body_html'])
-            ids.append(c['data']['id'])
-    return comments, ids
+    def __aiter__(self):
+        return self
 
+    async def new_session(self, token=None):
+        if self.session:
+            self.session.close()
+        head = {'user-agent': 'test app'}
+        if not token:
+            async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(*self.auth), headers=head) as client:
+                async with client.post(self.TOKEN_URL, data={'grant_type': 'client_credentials'}) as response:
+                    j = await response.json()
+                    self.token = j['access_token']
+                    head.update({'Authorization': 'bearer ' + self.token})
+        else:
+            head.update({'Authorization': 'bearer ' + token})
+        self.session = aiohttp.ClientSession(headers=head)
+        self.expiry_time = time.time() + 3598
 
-async def reddit(parent, topic, query):
-    links = {}
-    seen_comments = set()
-    link_last_ids = defaultdict(int)
-    link_last_id = None
-    start_time = time.time()
-    sess, expiry_time = await new_session(*parent.reddit_authentications[topic])
-    while parent.running:
+    async def fetch_json(self, url):
+        if self.rate_limit <= 0:
+            await asyncio.sleep(1)
+        self.rate_limit -= 1
         try:
-            params = {}
-            if link_last_id:
-                params['after'] = link_last_id
-            if link_last_ids[link_last_id]:
-                params['count'] = link_last_ids[link_last_id]
-
-            if parent.reddit_rate_limit[topic] <= 0:
-                await asyncio.sleep(2)
-            new_links, new_id = await links_from_subreddit(sess, query, **params)
-            parent.reddit_rate_limit[topic] -= 1
-
-            links.update(new_links)
-            link_last_id = new_id or link_last_id
-            link_last_ids[link_last_id] += len(new_links)
-
-            for link, time_created in list(links.items()):
-                if time.time() - time_created >= 2 * 24 * 3600:
-                    del links[link]
-                    continue
-
-                if parent.reddit_rate_limit[topic] <= 0:
-                    await asyncio.sleep(2)
-                comments, ids = await comments_from_link(sess, query, link)
-                parent.reddit_rate_limit[topic] -= 1
-
-                for c, cid in zip(comments, ids):
-                    if cid not in seen_comments:
-                        parent.result_queue.put(Item(c, topic, 'reddit'))
-                seen_comments.update(set(ids))
-
-                now = time.time()
-                if now - start_time >= 1:
-                    parent.reddit_rate_limit[topic] += 1
-                    start_time += 1
-                if time.time() >= expiry_time:
-                    sess, expiry_time = await new_session(*parent.reddit_authentications[topic])
+            async with self.session.get(url) as response:
+                data = await response.json()
+            return data
         except Exception as e:
             print('Reddit', repr(e))
+            await self.new_session(self.token)
+            return {}
+
+    async def get_comments(self, query, **params):
+        link_url = self.BASE + '{}/hot.json?{}&raw_json=1&limit=30'.format(query, urlencode(params))
+        comment_url = self.BASE + '%s/comments/{}.json?%s&raw_json=1&limit=10000&depth=10' % (query, urlencode(params))
+        j = await self.fetch_json(link_url)
+        links = {i['data']['id']: i['data']['created_utc'] for i in j['data']['children']}
+        last_id = j['data']['after']
+        for link in links:
+            try:
+                j = await self.fetch_json(comment_url.format(link))
+                for c in j[1]['data']['children']:
+                    if c['kind'] == 't1':
+                        if c['data']['id'] not in self.seen[query]:
+                            print(Item(c['data']['body_html'], self.topic, 'reddit'))
+                            self.queue.put(Item(c['data']['body_html'], self.topic, 'reddit'))
+                            self.seen[query].add(c['data']['id'])
+            except KeyError:
+                continue
+        return last_id
+
+    async def __anext__(self):
+        since = time.time() - self.clock
+        if since >= 1:
+            self.rate_limit += int(since)
+            self.clock += int(since)
+
+        if self.expiry_time - time.time() <= 0:
+            if self.session:
+                self.session.close()
+            await self.new_session()
+
+        try:
+            q = next(self.infinite_queries)
+        except StopIteration:
+            await asyncio.sleep(15)
+            self.infinite_queries = iter(self.queries)
+            q = next(self.infinite_queries)
+
+        for link, time_created in list(self.links[q].items()):
+            if time.time() - time_created >= 2 * 24 * 3600:
+                del self.links[q][link]
+
+        params = {}
+        if self.last_id[q]:
+            params['after'] = self.last_id[q]
+        if self.last_ids[q][self.last_id[q]]:
+            params['count'] = self.last_ids[q][self.last_id[q]]
+        self.last_id[q] = await self.get_comments(q, **params)
+        return
+
+    async def stream(self):
+        while True:
+            await self.__anext__()

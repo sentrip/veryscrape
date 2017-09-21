@@ -3,11 +3,56 @@ import json
 import re
 import time
 from contextlib import suppress
+from hashlib import sha1
+from random import SystemRandom
 
+import aioauth_client
+import aiohttp
 from aiohttp.client_exceptions import ClientHttpProxyError, ClientConnectorError, ServerDisconnectedError
 
-from base import AsyncOAuth
 from base import Item
+
+random = SystemRandom().random
+
+
+class AsyncOAuth(aioauth_client.Client):
+    access_token_key = 'oauth_token'
+    request_token_url = None
+    version = '1.0'
+
+    def __init__(self, consumer_key, consumer_secret, oauth_token=None, oauth_token_secret=None,
+                 base_url=None, signature=None, **params):
+        super().__init__(base_url, None, None, None, None)
+
+        self.oauth_token = oauth_token
+        self.oauth_token_secret = oauth_token_secret
+        self.consumer_key = consumer_key
+        self.consumer_secret = consumer_secret
+        self.params = params
+        self.signature = signature or aioauth_client.HmacSha1Signature()
+        self.sess = None
+
+    async def request(self, method, url, params=None, headers=None, timeout=10, loop=None, **aio_kwargs):
+        if not self.sess:
+            self.sess = aiohttp.ClientSession()
+        oparams = {
+            'oauth_consumer_key': self.consumer_key,
+            'oauth_nonce': sha1(str(random()).encode('ascii')).hexdigest(),
+            'oauth_signature_method': self.signature.name,
+            'oauth_timestamp': str(int(time.time())),
+            'oauth_version': self.version}
+        oparams.update(params or {})
+        if self.oauth_token:
+            oparams['oauth_token'] = self.oauth_token
+
+        url = self._get_url(url)
+        oparams['oauth_signature'] = self.signature.sign(self.consumer_secret, method, url,
+                                                         oauth_token_secret=self.oauth_token_secret, **oparams)
+
+        return await self.sess.request(method, url, params=oparams, headers=headers, **aio_kwargs)
+
+    def close(self):
+        self.sess.close()
 
 
 async def async_stream_read_loop(parent, stream, topic, chunk_size=1024):

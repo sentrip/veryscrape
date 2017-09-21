@@ -1,4 +1,5 @@
 # Class to stream text data from Google's services (news) and Twingly's services (blog)
+import asyncio
 import os
 import time
 from collections import deque
@@ -6,12 +7,76 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Thread
 from urllib.parse import urlencode
 
+import aiohttp
 import requests
 from fake_useragent import UserAgent
 from lxml import html
 from twingly_search import parser
 
-from base import BASE_DIR, Item, SearchClient
+from base import BASE_DIR, Item
+
+
+class SearchClient:
+    source = 'source'
+    name = 'client'
+
+    def __init__(self, user_agent, async=True):
+        self.session = aiohttp.ClientSession(headers={'User-Agent': user_agent}) if async else requests.Session()
+        if not async:
+            self.session.headers = {'User-Agent': user_agent}
+
+    def build_query(self, q):
+        pass
+
+    def parse_raw_html(self, h):
+        pass
+
+    @staticmethod
+    def urls_generator(result):
+        yield result
+
+    def clean_urls(self, urls):
+        domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
+        false_urls = {'google.', 'blogger.', 'youtube.', 'googlenewsblog.'}
+        for i in self.urls_generator(urls):
+            is_root_url = any(i.endswith(j) for j in domains)
+            is_not_relevant = any(j in i for j in false_urls)
+            if i.startswith('http') and not (is_root_url or is_not_relevant):
+                yield i
+
+    async def fetch_url_async(self, url):
+        async with self.session.get(url) as response:
+            return await response.text()
+
+    def fetch_url(self, url, proxy):
+        self.session.proxies = proxy
+        return self.session.get(url).content
+
+    async def execute_query(self, q):
+        """Executes the given search query and returns the result"""
+        query_url = self.build_query(q)
+        raw = await self.fetch_url_async(query_url)
+        scraped_urls = set()
+        try:
+            await asyncio.sleep(0)
+            for url in self.clean_urls(raw):
+                scraped_urls.add(url)
+                await asyncio.sleep(0)
+        except Exception as e:
+            pass
+        return scraped_urls
+
+    def execute_query_no_async(self, q, proxy):
+        """Executes the given search query and returns the result"""
+        query_url = self.build_query(q)
+        raw = self.fetch_url(query_url, proxy)
+        scraped_urls = set()
+        try:
+            for url in self.clean_urls(self.urls_generator(raw)):
+                scraped_urls.add(url)
+        except Exception as e:
+            pass
+        return scraped_urls
 
 
 class TwinglyClient(SearchClient):
@@ -86,8 +151,8 @@ def client_search(client, topic, query, seen_urls, queue, proxy, proxy_thread):
 
 def single_download(parent, sess, item):
     try:
-        response = sess.get(item.content, headers={'user-agent': UserAgent().random})
-        parent.result_queue.put(Item(str(response.content), item.topic, item.source))
+        h = sess.get(item.content, headers={'user-agent': UserAgent().random}).content
+        parent.result_queue.put(Item(str(h), item.topic, item.source))
     except:
         pass
 
