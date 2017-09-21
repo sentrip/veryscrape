@@ -78,11 +78,10 @@ class SearchClient:
     source = 'source'
     name = 'client'
 
-    def __init__(self, user_agent, proxy, async=True):
+    def __init__(self, user_agent, async=True):
         self.session = aiohttp.ClientSession(headers={'User-Agent': user_agent}) if async else requests.Session()
         if not async:
             self.session.headers = {'User-Agent': user_agent}
-        self.proxy = proxy
 
     def build_query(self, q):
         pass
@@ -108,7 +107,8 @@ class SearchClient:
         async with self.session.get(url) as response:  # proxy=self.proxy
             return await response.text()
 
-    def fetch_url(self, url):
+    def fetch_url(self, url, proxy):
+        self.session.proxies = proxy
         return self.session.get(url).content
 
     async def execute_query(self, q):
@@ -125,10 +125,10 @@ class SearchClient:
             pass
         return scraped_urls
 
-    def execute_query_no_async(self, q):
+    def execute_query_no_async(self, q, proxy):
         """Executes the given search query and returns the result"""
         query_url = self.build_query(q)
-        raw = self.fetch_url(query_url)
+        raw = self.fetch_url(query_url, proxy)
         scraped_urls = set()
         try:
             for url in self.clean_urls(self.urls_generator(raw)):

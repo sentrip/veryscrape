@@ -8,7 +8,7 @@ import requests
 from fake_useragent import UserAgent
 
 from base import Producer, Item
-from proxy import ProxySnatcher
+from extensions.proxy import ProxySnatcher
 
 
 class FinanceWorker(Process):
@@ -28,16 +28,20 @@ class FinanceWorker(Process):
             stock_price = eval(tmp.group(2).replace(',', ''))
         return stock_price
 
-    def finance_search(self, query, proxy, user_agent):
+    def finance_search(self, query, proxy, user_agent, proxy_thread):
         """Query recent stock price for query using provided user agent and proxy"""
         search_url = "http://www.google.com/finance?&q=" + query
-        # Request url
-        resp = requests.get(search_url, proxies=proxy, headers={'User-Agent': user_agent})
-        # Parse html
-        stock_price = self.extract_stock(resp.text)
-        # Record value in item
-        stock_item = Item(content=stock_price, topic=query, source='stock')
-        return stock_item
+        resp, stock_price = '', 0.0
+        ex = False
+        while not resp:
+            try:
+                resp = requests.get(search_url, proxies=proxy if not ex else proxy_thread.random('article', True),
+                                    headers={'User-Agent': user_agent})
+                stock_price = self. extract_stock(resp.text)
+            except Exception as e:
+                print('Finance', e)
+                ex = True
+        return Item(content=stock_price, topic=query, source='stock')
 
     def run(self):
         l = connection.Listener(('localhost', self.port), authkey=b'veryscrape')
@@ -55,8 +59,8 @@ class FinanceWorker(Process):
         while self.running:
             start = time.time()
             for query in self.topics:
-                proxy = proxy_thread.random('article', return_dict=True)
+                proxy = proxy_thread.random('article', True)
                 # Submit finance search for each query with random proxy
-                future = pool.submit(self.finance_search, query, proxy, fua.random)
+                future = pool.submit(self.finance_search, query, proxy, fua.random, proxy_thread)
                 future.add_done_callback(lambda f: outgoing.send(f.result()))
             time.sleep(max(0, self.send_every - (time.time() - start)))

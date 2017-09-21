@@ -55,6 +55,7 @@ async def twitter(parent, topic, query):
         except Exception as e:
             print('Twitter', repr(e))
             await asyncio.sleep(retry_time * 2)
+            client.close()
             client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
             continue
 

@@ -66,6 +66,8 @@ class ProxySnatcher(Thread):
 
     def random(self, proxy_type, return_dict=False):
         """Returns random proxy that was not used recently"""
+        while len(self.proxies[proxy_type]) == 0:
+            sleep(0.01)
         random_proxy = heapq.heappop(self.proxies[proxy_type])
         return random_proxy.proxy_dict if return_dict else random_proxy.full_address
 

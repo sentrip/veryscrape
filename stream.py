@@ -2,6 +2,7 @@ from multiprocessing import Queue
 from threading import Thread
 
 from base import Producer
+from extensions.proxy import ProxySnatcher
 from extensions.reddit import reddit
 from extensions.search import search
 from extensions.twitter import twitter
@@ -20,7 +21,15 @@ class StreamWorker(Producer):
         self.reddit_rate_limit = {k: 60 for k in self.topics}
 
     def initialize_work(self):
-        Thread(target=search, args=(self, )).start()
+        proxy_thread = ProxySnatcher(len(self.topics),
+                                     **{'minDownloadSpeed': '100',
+                                        'protocol': 'http',
+                                        'allowsHttps': 1,
+                                        'allowsUserAgentHeader': 1,
+                                        'allowsCustomHeaders': 1})
+        proxy_thread.start()
+        proxy_thread.wait_for_proxies()
+        Thread(target=search, args=(self, proxy_thread,)).start()
         jobs = [[], []]
         for topic in self.topics:
             for query in self.subreddits[topic]:
