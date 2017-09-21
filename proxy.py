@@ -66,23 +66,34 @@ class ProxySnatcher(Thread):
 
     def random(self, proxy_type, return_dict=False):
         """Returns random proxy that was not used recently"""
-        while len(self.proxies[proxy_type]) == 0:
-            sleep(0.01)
         random_proxy = heapq.heappop(self.proxies[proxy_type])
         return random_proxy.proxy_dict if return_dict else random_proxy.full_address
 
+    def wait_for_proxies(self):
+        while any(len(self.proxies[t]) < self.proxies_required * 3 for t in self.proxies):
+            sleep(0.01)
+
     async def fetch_proxies(self):
         """Fetches proxies from api and pushes onto heap"""
+        session = aiohttp.ClientSession()
         while self.running:
-            while any(len(self.proxies[t]) < self.proxies_required * 2 for t in self.proxies):
-                async with aiohttp.ClientSession() as session:
+            if any(len(self.proxies[t]) <= self.proxies_required * 3 for t in self.proxies):
+                try:
                     async with session.get(self.url) as response:
                         data = await response.text()
-                        proxy = Proxy(**json.loads(data))
-                        for t in self.proxies:
-                            if proxy not in self.proxies[t]:
-                                heapq.heappush(self.proxies[t], proxy)
-            await asyncio.sleep(0.1)
+                    proxy = Proxy(**json.loads(data))
+                    seen = True
+                    for t in self.proxies:
+                        if proxy not in self.seen_proxies:
+                            seen = False
+                            heapq.heappush(self.proxies[t], proxy)
+                    if not seen:
+                        self.seen_proxies.append(proxy)
+                    await asyncio.sleep(0.1)
+                except:
+                    session.close()
+                    session = aiohttp.ClientSession()
+                    await asyncio.sleep(0.5)
 
     def run(self):
         loop = asyncio.new_event_loop()
