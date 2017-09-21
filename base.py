@@ -9,6 +9,7 @@ from threading import Thread
 
 import aioauth_client
 import aiohttp
+import requests
 
 random = SystemRandom().random
 BASE_DIR = "/home/djordje/Sentrip/"
@@ -74,8 +75,13 @@ class AsyncOAuth(aioauth_client.Client):
 
 
 class SearchClient:
-    def __init__(self, user_agent, proxy):
-        self.session = aiohttp.ClientSession(headers={'User-Agent': user_agent})
+    source = 'source'
+    name = 'client'
+
+    def __init__(self, user_agent, proxy, async=True):
+        self.session = aiohttp.ClientSession(headers={'User-Agent': user_agent}) if async else requests.Session()
+        if not async:
+            self.session.headers = {'User-Agent': user_agent}
         self.proxy = proxy
 
     def build_query(self, q):
@@ -98,20 +104,35 @@ class SearchClient:
             if i.startswith('http') and not (is_root_url or is_not_relevant):
                 yield i
 
-    async def fetch_url(self, url):
+    async def fetch_url_async(self, url):
         async with self.session.get(url) as response:  # proxy=self.proxy
             return await response.text()
+
+    def fetch_url(self, url):
+        return self.session.get(url).content
 
     async def execute_query(self, q):
         """Executes the given search query and returns the result"""
         query_url = self.build_query(q)
-        raw = await self.fetch_url(query_url)
+        raw = await self.fetch_url_async(query_url)
         scraped_urls = set()
         try:
             await asyncio.sleep(0)
             for url in self.clean_urls(self.urls_generator(raw)):
                 scraped_urls.add(url)
                 await asyncio.sleep(0)
+        except Exception as e:
+            pass
+        return scraped_urls
+
+    def execute_query_no_async(self, q):
+        """Executes the given search query and returns the result"""
+        query_url = self.build_query(q)
+        raw = self.fetch_url(query_url)
+        scraped_urls = set()
+        try:
+            for url in self.clean_urls(self.urls_generator(raw)):
+                scraped_urls.add(url)
         except Exception as e:
             pass
         return scraped_urls

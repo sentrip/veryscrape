@@ -1,10 +1,12 @@
 # Class to stream text data from Google's services (news) and Twingly's services (blog)
-import asyncio
 import os
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
 from urllib.parse import urlencode
 
+import requests
 from fake_useragent import UserAgent
 from lxml import html
 from twingly_search import parser
@@ -16,10 +18,12 @@ class TwinglyClient(SearchClient):
     """Custom Twingly Search API client"""
     SEARCH_API_VERSION = "v3"
     API_URL = "https://api.twingly.com/blog/search/api/%s/search" % SEARCH_API_VERSION
+    name = 'Twingly'
 
-    def __init__(self, api_key, proxy):
-        super(TwinglyClient, self).__init__("Twingly Search Python Client/2.1.0", proxy)
+    def __init__(self, api_key, proxy, async):
+        super(TwinglyClient, self).__init__("Twingly Search Python Client/2.1.0", proxy, async)
         self.api_key = api_key or self.load_authentications()
+        self.source = 'blog'
 
     @staticmethod
     def load_authentications():
@@ -48,6 +52,8 @@ class TwinglyClient(SearchClient):
 class GoogleClient(SearchClient):
     """Custom Google News Search client"""
     API_URL = 'https://news.google.com/news/search/section/q/{}/{}?hl=en&ned=us'
+    name = 'Google'
+    source = 'article'
 
     def build_query(self, q):
         return self.API_URL.format(q, q)
@@ -58,43 +64,55 @@ class GoogleClient(SearchClient):
         for e in result.xpath('//*[@href]'):
             yield e.get('href') if e.get('href') is not None else ''
 
-async def search(parent, topic, query, search_every=15*60):
-    fake_users = UserAgent()
-    retry_time = 10.0
-    seen_urls = deque(maxlen=100000)
-    google = GoogleClient(fake_users.random, None)
-    twingly = TwinglyClient(None, None)
-    expiry_time = time.time()
-    api_key = twingly.api_key
 
-    while parent.running:
-        try:
-            google_urls = await google.execute_query(query)
-        except Exception as e:
-            print('Google', repr(e))
-            google_urls = []
-            await asyncio.sleep(retry_time)
-            google.session.close()
-            google = GoogleClient(fake_users.random, None)
-        try:
-            twingly_urls = await twingly.execute_query(query)
-        except Exception as e:
-            print('Twingly', repr(e))
-            twingly_urls = []
-            await asyncio.sleep(retry_time)
-            twingly.session.close()
-            twingly = TwinglyClient(api_key, None)
-
-        for url, url_type in zip([*google_urls, *twingly_urls], ['article']*len(google_urls) + ['blog']*len(twingly_urls)):
+def client_search(client, topic, query, seen_urls, queue):
+    try:
+        urls = client.execute_query_no_async(query)
+        for url in urls:
             if url not in seen_urls:
-                new_item = Item(content=url, topic=topic, source=url_type)
+                new_item = Item(content=url, topic=topic, source=client.source)
                 seen_urls.append(url)
-                parent.url_queue.put(new_item)
+                queue.put(new_item)
+    except Exception as e:
+        print(client.name, repr(e))
 
-        await asyncio.sleep(search_every)
+
+def single_download(parent, sess, item):
+    try:
+        response = sess.get(item.content, headers={'user-agent': UserAgent().random})
+        parent.result_queue.put(Item(str(response.content), item.topic, item.source))
+    except:
+        pass
+
+
+def download(pool, parent):
+    """Async downloading of html text from article urls"""
+    sess = requests.Session()
+    while parent.running:
+        if not parent.url_queue.empty():
+            item = parent.url_queue.get_nowait()
+            pool.submit(single_download, parent, sess, item)
+    sess.close()
+
+
+def search(parent, search_every=15*60):
+    fake_users = UserAgent()
+    seen_urls = deque(maxlen=100000)
+    google = GoogleClient(fake_users.random, None, False)
+    twingly = TwinglyClient(None, None, False)
+    expiry_time = time.time()
+    pool = ThreadPoolExecutor(100 + len(parent.topics))
+    Thread(target=download, args=(pool, parent, )).start()
+    while parent.running:
+        start_time = time.time()
+        for topic in parent.topics:
+            for query in parent.topics[topic]:
+                pool.submit(client_search, twingly, topic, query, seen_urls, parent.url_queue)
+                pool.submit(client_search, google, topic, query, seen_urls, parent.url_queue)
+        time.sleep(max(0, search_every - (time.time() - start_time)))
         if time.time() - expiry_time >= 3600:
             api_key = twingly.load_authentications()
+            twingly = TwinglyClient(api_key, None, False)
             expiry_time = time.time()
-
     twingly.session.close()
     google.session.close()
