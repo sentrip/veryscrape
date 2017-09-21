@@ -4,6 +4,8 @@ import re
 import time
 from contextlib import suppress
 
+from aiohttp.client_exceptions import ClientHttpProxyError, ClientConnectorError, ServerDisconnectedError
+
 from base import AsyncOAuth
 from base import Item
 
@@ -52,6 +54,10 @@ async def twitter(parent, topic, query, proxy_thread):
     while parent.running:
         try:
             stream = await client.request('POST', 'statuses/filter.json', params=p, proxy=proxy)
+        except (ClientHttpProxyError, ClientConnectorError, ServerDisconnectedError):
+            proxy = await proxy_thread.random_async('twitter', False)
+            client.close()
+            client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
         except Exception as e:
             print('Twitter', repr(e))
             proxy = await proxy_thread.random_async('twitter', False)
