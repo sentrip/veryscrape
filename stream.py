@@ -22,9 +22,10 @@ class StreamWorker(Producer):
 
     def initialize_work(self):
         proxy_thread = ProxySnatcher(len(self.topics),
-                                     **{'minDownloadSpeed': '100',
+                                     **{'minDownloadSpeed': '250',
                                         'protocol': 'http',
                                         'allowsHttps': 1,
+                                        'allowsPost': 1,
                                         'allowsUserAgentHeader': 1,
                                         'allowsCustomHeaders': 1})
         proxy_thread.start()
@@ -33,7 +34,7 @@ class StreamWorker(Producer):
         jobs = [[], []]
         for topic in self.topics:
             for query in self.subreddits[topic]:
-                jobs[0].append(reddit(self, topic, query))
+                 jobs[0].append(reddit(self, topic, query))
             for query in self.topics[topic]:
-                jobs[1].append(twitter(self, topic, query))
+                jobs[1].append(twitter(self, topic, query, proxy_thread))
         return jobs

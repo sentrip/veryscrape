@@ -71,15 +71,22 @@ class ProxySnatcher(Thread):
         random_proxy = heapq.heappop(self.proxies[proxy_type])
         return random_proxy.proxy_dict if return_dict else random_proxy.full_address
 
+    async def random_async(self, proxy_type, return_dict=False):
+        """Returns random proxy that was not used recently"""
+        while len(self.proxies[proxy_type]) == 0:
+            await asyncio.sleep(0.01)
+        random_proxy = heapq.heappop(self.proxies[proxy_type])
+        return random_proxy.proxy_dict if return_dict else random_proxy.full_address
+
     def wait_for_proxies(self):
-        while any(len(self.proxies[t]) < self.proxies_required * 3 for t in self.proxies):
+        while any(len(self.proxies[t]) < self.proxies_required * 5 for t in self.proxies):
             sleep(0.01)
 
     async def fetch_proxies(self):
         """Fetches proxies from api and pushes onto heap"""
         session = aiohttp.ClientSession()
         while self.running:
-            if any(len(self.proxies[t]) <= self.proxies_required * 3 for t in self.proxies):
+            if any(len(self.proxies[t]) <= self.proxies_required * 5 for t in self.proxies):
                 try:
                     async with session.get(self.url) as response:
                         data = await response.text()

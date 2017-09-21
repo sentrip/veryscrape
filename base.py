@@ -93,18 +93,17 @@ class SearchClient:
     def urls_generator(result):
         yield result
 
-    @staticmethod
-    def clean_urls(urls):
+    def clean_urls(self, urls):
         domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
         false_urls = {'google.', 'blogger.', 'youtube.', 'googlenewsblog.'}
-        for i in urls:
+        for i in self.urls_generator(urls):
             is_root_url = any(i.endswith(j) for j in domains)
             is_not_relevant = any(j in i for j in false_urls)
             if i.startswith('http') and not (is_root_url or is_not_relevant):
                 yield i
 
     async def fetch_url_async(self, url):
-        async with self.session.get(url) as response:  # proxy=self.proxy
+        async with self.session.get(url) as response:
             return await response.text()
 
     def fetch_url(self, url, proxy):
@@ -118,7 +117,7 @@ class SearchClient:
         scraped_urls = set()
         try:
             await asyncio.sleep(0)
-            for url in self.clean_urls(self.urls_generator(raw)):
+            for url in self.clean_urls(raw):
                 scraped_urls.add(url)
                 await asyncio.sleep(0)
         except Exception as e:

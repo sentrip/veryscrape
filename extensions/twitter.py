@@ -36,7 +36,7 @@ async def async_stream_read_loop(parent, stream, topic, chunk_size=1024):
                     parent.result_queue.put(Item(s['text'], topic, 'twitter'))
 
 
-async def twitter(parent, topic, query):
+async def twitter(parent, topic, query, proxy_thread):
     """Asynchronous twitter stream - streams tweets for provided query, topic is used for categorization"""
     retry_time_start = 5.0
     retry_420_start = 60.0
@@ -48,12 +48,13 @@ async def twitter(parent, topic, query):
     auth = parent.twitter_authentications[topic]
     client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
     p = {'language': 'en', 'track': query}
+    proxy = await proxy_thread.random_async('twitter', False)
     while parent.running:
-        # get proxy
         try:
-            stream = await client.request('POST', 'statuses/filter.json', params=p)
+            stream = await client.request('POST', 'statuses/filter.json', params=p, proxy=proxy)
         except Exception as e:
             print('Twitter', repr(e))
+            proxy = await proxy_thread.random_async('twitter', False)
             await asyncio.sleep(retry_time * 2)
             client.close()
             client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
