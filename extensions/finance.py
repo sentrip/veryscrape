@@ -25,7 +25,7 @@ class FinanceWorker(Producer):
 
     async def fetch_stocks(self, query):
         """Searches stock prices for all companies in query topics every minute"""
-        query_url = "http://www.google.com/finance?&q="
+        query_url = "https://www.google.com/finance?&q={}"
         fake_users = UserAgent()
         sess = aiohttp.ClientSession()
         while self.running:
@@ -33,8 +33,8 @@ class FinanceWorker(Producer):
             # proxy = proxy_thread.random()
             async with sess.get(query_url.format(query), headers={'user-agent': fake_users.random}) as response:
                 h = await response.text()
-                price = extract_stock(h)
-                self.result_queue.put(Item(price, query, 'stock'))
+            price = extract_stock(h)
+            self.result_queue.put(Item(price, query, 'stock'))
             await asyncio.sleep(max(0, self.send_every - (time.time() - start)))
         sess.close()
 
