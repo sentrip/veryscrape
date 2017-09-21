@@ -1,14 +1,18 @@
 import time
-from multiprocessing.connection import Client
+from threading import Lock
 
 # from preprocess import PreProcessWorker
 # from sentimentprocess import SentimentWorker
 from extensions.finance import FinanceWorker
 
+#from write import WriteWorker
+
 if __name__ == '__main__':
+    file_lock = Lock()
     f = FinanceWorker(send_every=10)
     f.start()
-    # s = StreamWorker(use_processes=False)
+    time.sleep(1)
+    # s = StreamWorker(use_processes=True)
     # s.start()
     # time.sleep(1)
     # p = PreProcessWorker()
@@ -17,14 +21,13 @@ if __name__ == '__main__':
     # st = SentimentWorker(send_every=10)
     # st.start()
     # time.sleep(1)
-    # l = deque()
-    # for _ in range(2*len(s.topics)+1):
-    #     l.append(Item())
-    c = Client(('localhost', 6009), authkey=b'veryscrape')
-    t = time.time()
-    while True:
-        i = c.recv()
-        #l.append(i)
-        print(i, '{:.2f}'.format(time.time()-t))
-        #_ = l.popleft()
-        t = time.time()
+    #
+    # w = WriteWorker(file_lock, send_every=10)
+    # w.start()
+    # time.sleep(1)
+    # c = Client(('localhost', 6002), authkey=b'veryscrape')
+    # t = time.time()
+    # while True:
+    #     i = c.recv()
+    #     print(i, '{:.2f}'.format(time.time()-t))
+    #     t = time.time()
