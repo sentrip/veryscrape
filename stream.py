@@ -4,7 +4,7 @@ from base import Producer
 from extensions.proxy import ProxySnatcher
 from extensions.reddit import CommentStream
 from extensions.search import NewsStream
-from extensions.twitter import twitter
+from extensions.twitter import TweetStream
 
 
 class StreamWorker(Producer):
@@ -12,7 +12,7 @@ class StreamWorker(Producer):
         super(StreamWorker, self).__init__(port, use_processes)
         self.url_queue = Queue()
         # Twitter
-        self.twitter_authentications = self.load_authentications('twitter.txt', self.topics)
+        self.twitter_auths = self.load_authentications('twitter.txt', self.topics)
         # Reddit
         self.reddit_auths = self.load_authentications('reddit.txt', self.topics)
         self.subreddits = self.load_query_dictionary('subreddits1.txt')
@@ -24,14 +24,13 @@ class StreamWorker(Producer):
                                      **{'minDownloadSpeed': '100',
                                         'protocol': 'http',
                                         'allowsHttps': 1,
-                                        'allowsUserAgentHeader': 1,
-                                        'allowsCustomHeaders': 1})
+                                        'allowsCookies': 1,
+                                        'allowsUserAgentHeader': 1})
         proxy_thread.start()
         proxy_thread.wait_for_proxies()
         NewsStream(self, proxy_thread).start()
         jobs = [[], []]
-        for topic in self.topics:
+        for topic, qs in self.topics.items():
             jobs[0].append(CommentStream(self.reddit_auths[topic], topic, self.subreddits[topic], self.result_queue).stream())
-            for query in self.topics[topic]:
-                jobs[1].append(twitter(self, topic, query, proxy_thread))
+            jobs[1].append(TweetStream(self.twitter_auths[topic], topic, qs, self.result_queue).stream())
         return jobs

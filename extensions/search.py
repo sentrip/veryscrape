@@ -123,7 +123,8 @@ class NewsStream(Thread):
         self.twingly = TwinglyClient(None)
         self.sess = requests.Session()
         self.expiry_time = time.time()
-        self.pool = ThreadPoolExecutor(100 + len(parent.topics))
+        self.pool = ThreadPoolExecutor(len(parent.topics))
+        self.download_pool = ThreadPoolExecutor(100)
 
     def single_download(self, item):
         with suppress(requests.exceptions.SSLError):
@@ -135,7 +136,7 @@ class NewsStream(Thread):
         while self.parent.running:
             if not self.parent.url_queue.empty():
                 item = self.parent.url_queue.get_nowait()
-                self.pool.submit(self.single_download, item)
+                self.download_pool.submit(self.single_download, item)
 
     def client_search(self, client, topic, query, proxy=None):
         success = False
@@ -161,8 +162,8 @@ class NewsStream(Thread):
             for topic in self.parent.topics:
                 proxy = self.proxies.random('article', True)
                 for query in self.parent.topics[topic]:
-                    self.pool.submit(self.client_search, self.twingly, topic, query)
                     self.pool.submit(self.client_search, self.google, topic, query, proxy)
+                    self.pool.submit(self.client_search, self.twingly, topic, query)
             time.sleep(max(0, 15 * 60 - (time.time() - start_time)))
             if time.time() - clock >= 3600:
                 api_key = self.twingly.load_authentications()

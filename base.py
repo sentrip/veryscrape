@@ -91,4 +91,7 @@ class AsyncStream:
 
     async def stream(self):
         while True:
-            await self.__anext__()
+            try:
+                await self.__anext__()
+            except StopAsyncIteration:
+                break

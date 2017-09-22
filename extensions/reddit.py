@@ -1,6 +1,7 @@
 import asyncio
 import time
 from collections import defaultdict
+from contextlib import suppress
 from urllib.parse import urlencode
 
 import aiohttp
@@ -58,24 +59,24 @@ class CommentStream(AsyncStream):
             await self.new_session(self.token)
             return {}
 
-    async def get_comments(self, query, **params):
-        link_url = self.BASE + '{}/hot.json?{}&raw_json=1&limit=30'.format(query, urlencode(params))
-        comment_url = self.BASE + '%s/comments/{}.json?%s&raw_json=1&limit=10000&depth=10' % (query, urlencode(params))
-        j = await self.fetch_json(link_url)
-        links = {i['data']['id']: i['data']['created_utc'] for i in j['data']['children']}
-        last_id = j['data']['after']
-        for link in links:
-            try:
-                j = await self.fetch_json(comment_url.format(link))
-                for c in j[1]['data']['children']:
-                    if c['kind'] == 't1':
-                        if c['data']['id'] not in self.seen[query]:
-                            print(Item(c['data']['body_html'], self.topic, 'reddit'))
-                            self.queue.put(Item(c['data']['body_html'], self.topic, 'reddit'))
-                            self.seen[query].add(c['data']['id'])
-            except KeyError:
-                continue
-        return last_id
+    async def get_comments(self, query,**params):
+        try:
+            link_url = self.BASE + '{}/hot.json?{}&raw_json=1&limit=30'.format(query, urlencode(params))
+            comment_url = self.BASE + '%s/comments/{}.json?%s&raw_json=1&limit=10000&depth=10' % (query, urlencode(params))
+            j = await self.fetch_json(link_url)
+            links = {i['data']['id']: i['data']['created_utc'] for i in j['data']['children']}
+            last_id = j['data']['after']
+            for link in links:
+                with suppress(KeyError):
+                    j = await self.fetch_json(comment_url.format(link))
+                    for c in j[1]['data']['children']:
+                        if c['kind'] == 't1':
+                            if c['data']['id'] not in self.seen[query]:
+                                self.queue.put(Item(c['data']['body_html'], self.topic, 'reddit'))
+                                self.seen[query].add(c['data']['id'])
+            return last_id
+        except KeyError:
+            return None
 
     async def __anext__(self):
         since = time.time() - self.clock
