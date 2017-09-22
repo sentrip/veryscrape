@@ -13,7 +13,7 @@ from base import Producer, Item
 class FinanceWorker(Process):
     def __init__(self, proxy_thread, port=6009, send_every=60):
         super(FinanceWorker, self).__init__()
-        self.topics = Producer.load_query_dictionary('query_topics1.txt')
+        self.topics = Producer.load_query_dictionary('query_topics.txt')
         self.port = port
         self.send_every = send_every
         self.proxy_thread = proxy_thread

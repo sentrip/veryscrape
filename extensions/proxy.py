@@ -80,9 +80,9 @@ class ProxySnatcher(Thread):
 
     def wait_for_proxies(self):
         print('Now waiting to acquire proxies...')
-        while len(self.proxies['article']) < self.proxies_required * 3:
+        while len(self.proxies['article']) < self.proxies_required * 2:
             sleep(1)
-            print('Currently have {}/{}'.format(len(self.proxies['article']), self.proxies_required*3))
+            print('Currently have {}/{}'.format(len(self.proxies['article']), self.proxies_required*2))
         print('Proxies acquired, now initializing streams...')
 
     async def fetch_single(self, session):
@@ -108,11 +108,10 @@ class ProxySnatcher(Thread):
         session = aiohttp.ClientSession()
         try:
             while self.running:
-                if any(len(self.proxies[t]) <= self.proxies_required * 3 for t in self.proxies):
-                    n = max(1, min(15, 3 * self.proxies_required - min(*[len(self.proxies[t]) for t in self.proxies])))
+                if any(len(self.proxies[t]) <= self.proxies_required * 2 for t in self.proxies):
+                    n = max(1, min(15, 2 * self.proxies_required - min(*[len(self.proxies[t]) for t in self.proxies])))
                     results = await asyncio.gather(*[self.fetch_single(session) for _ in range(n)])
                     if not all(results):
-                        session.close()
                         session = aiohttp.ClientSession()
         finally:
             session.close()
