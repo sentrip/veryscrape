@@ -5,10 +5,10 @@ from urllib.parse import urlencode
 
 import aiohttp
 
-from base import Item
+from base import Item, AsyncStream
 
 
-class AsyncCommentStream:
+class CommentStream(AsyncStream):
     BASE = 'https://oauth.reddit.com/r/'
     TOKEN_URL = 'https://www.reddit.com/api/v1/access_token'
 
@@ -29,9 +29,6 @@ class AsyncCommentStream:
         self.token = None
         self.expiry_time = 0
         self.rate_limit = 60
-
-    def __aiter__(self):
-        return self
 
     async def new_session(self, token=None):
         if self.session:
@@ -109,7 +106,3 @@ class AsyncCommentStream:
             params['count'] = self.last_ids[q][self.last_id[q]]
         self.last_id[q] = await self.get_comments(q, **params)
         return
-
-    async def stream(self):
-        while True:
-            await self.__anext__()

@@ -79,3 +79,16 @@ class Producer(Process):
                 self.W(target=self.run_in_loop, args=(set_of_jobs,)).start()
         while self.running:
             self.outgoing.send(self.result_queue.get())
+
+
+class AsyncStream:
+
+    def __aiter__(self):
+        return self
+
+    def __anext__(self):
+        return
+
+    async def stream(self):
+        while True:
+            await self.__anext__()
