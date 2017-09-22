@@ -15,16 +15,15 @@ class StreamWorker(Producer):
         self.twitter_auths = self.load_authentications('twitter.txt', self.topics)
         # Reddit
         self.reddit_auths = self.load_authentications('reddit.txt', self.topics)
-        self.subreddits = self.load_query_dictionary('subreddits1.txt')
+        self.subreddits = self.load_query_dictionary('subreddits.txt')
         # Rate limits
         self.reddit_rate_limit = {k: 60 for k in self.topics}
 
     def initialize_work(self):
         proxy_thread = ProxySnatcher(len(self.topics),
-                                     **{'minDownloadSpeed': '100',
+                                     **{'minDownloadSpeed': '50',
                                         'protocol': 'http',
                                         'allowsHttps': 1,
-                                        'allowsCookies': 1,
                                         'allowsUserAgentHeader': 1})
         proxy_thread.start()
         proxy_thread.wait_for_proxies()

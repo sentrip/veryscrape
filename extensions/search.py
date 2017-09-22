@@ -5,6 +5,7 @@ import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
+from multiprocessing import Process
 from threading import Thread
 from urllib.parse import urlencode
 
@@ -112,7 +113,7 @@ class GoogleClient(SearchClient):
             yield e.get('href') if e.get('href') is not None else ''
 
 
-class NewsStream(Thread):
+class NewsStream(Process):
     def __init__(self, parent, proxy_thread):
         super(NewsStream, self).__init__()
         self.parent = parent
@@ -124,7 +125,7 @@ class NewsStream(Thread):
         self.sess = requests.Session()
         self.expiry_time = time.time()
         self.pool = ThreadPoolExecutor(len(parent.topics))
-        self.download_pool = ThreadPoolExecutor(100)
+        self.download_pool = ThreadPoolExecutor(len(parent.topics) * 5)
 
     def single_download(self, item):
         with suppress(requests.exceptions.SSLError):

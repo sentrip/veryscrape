@@ -105,5 +105,7 @@ class PreProcessWorker(Process):
                 item = clean_general(item)
                 item = feature_convert(item, self.vocab)
                 outgoing.send(item)
-            except:
+            except AttributeError:
                 pass
+            except Exception as e:
+                print('PreProcess', repr(e))
