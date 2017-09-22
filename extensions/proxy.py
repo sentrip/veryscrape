@@ -60,7 +60,7 @@ class ProxySnatcher(Thread):
             key = f.read()
         params.update({'apiKey': key})
         self.url = 'https://api.getproxylist.com/proxy?anonymity=high%20anonymity&' + urlencode(params)
-        self.proxies = {'reddit': [], 'twitter': [], 'article': [], 'blog': []}
+        self.proxies = {'article': [], 'stock': []}
         self.seen_proxies = deque(maxlen=proxies_required*10)
         self.running = True
 
@@ -80,7 +80,7 @@ class ProxySnatcher(Thread):
 
     def wait_for_proxies(self):
         print('Now waiting to acquire proxies...')
-        while any(len(self.proxies[t]) < self.proxies_required * 3 for t in self.proxies):
+        while len(self.proxies['article']) < self.proxies_required * 3:
             sleep(1)
             print('Currently have {}/{}'.format(len(self.proxies['article']), self.proxies_required*3))
         print('Proxies acquired, now initializing streams...')
@@ -106,11 +106,16 @@ class ProxySnatcher(Thread):
     async def fetch_proxies(self):
         """Fetches proxies from api and pushes onto heap"""
         session = aiohttp.ClientSession()
-        while self.running:
-            if any(len(self.proxies[t]) <= self.proxies_required * 3 for t in self.proxies):
-                results = await asyncio.gather(*[self.fetch_single(session) for _ in range(max(1, min(15, 3 * self.proxies_required - len(self.proxies['article']))))])
-                if not all(results):
-                    session = aiohttp.ClientSession()
+        try:
+            while self.running:
+                if any(len(self.proxies[t]) <= self.proxies_required * 3 for t in self.proxies):
+                    n = max(1, min(15, 3 * self.proxies_required - min(*[len(self.proxies[t]) for t in self.proxies])))
+                    results = await asyncio.gather(*[self.fetch_single(session) for _ in range(n)])
+                    if not all(results):
+                        session.close()
+                        session = aiohttp.ClientSession()
+        finally:
+            session.close()
 
     def run(self):
         loop = asyncio.new_event_loop()

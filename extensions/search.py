@@ -114,10 +114,10 @@ class GoogleClient(SearchClient):
 
 
 class NewsStream(Process):
-    def __init__(self, parent, proxy_thread):
+    def __init__(self, parent):
         super(NewsStream, self).__init__()
         self.parent = parent
-        self.proxies = proxy_thread
+        self.proxies = parent.proxy_thread
         self.fake_users = UserAgent()
         self.seen = deque(maxlen=100000)
         self.google = GoogleClient(self.fake_users.random)
