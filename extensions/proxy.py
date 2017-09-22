@@ -60,7 +60,7 @@ class ProxySnatcher(Thread):
             key = f.read()
         params.update({'apiKey': key})
         self.url = 'https://api.getproxylist.com/proxy?anonymity=high%20anonymity&' + urlencode(params)
-        self.proxies = {'reddit': [], 'twitter': [], 'article': [], 'blog': []}
+        self.proxies = {'article': [], 'stock': []}
         self.seen_proxies = deque(maxlen=proxies_required*10)
         self.running = True
 
@@ -79,30 +79,42 @@ class ProxySnatcher(Thread):
         return random_proxy.proxy_dict if return_dict else random_proxy.full_address
 
     def wait_for_proxies(self):
-        while any(len(self.proxies[t]) < self.proxies_required * 5 for t in self.proxies):
-            sleep(0.01)
+        print('Now waiting to acquire proxies...')
+        while len(self.proxies['article']) < self.proxies_required * 2:
+            sleep(1)
+            print('Currently have {}/{}'.format(len(self.proxies['article']), self.proxies_required*2))
+        print('Proxies acquired, now initializing streams...')
+
+    async def fetch_single(self, session):
+        try:
+            async with session.get(self.url) as response:
+                data = await response.text()
+            proxy = Proxy(**json.loads(data))
+            seen = True
+            for t in self.proxies:
+                if proxy not in self.seen_proxies:
+                    seen = False
+                    heapq.heappush(self.proxies[t], proxy)
+            if not seen:
+                self.seen_proxies.append(proxy)
+            return True
+        except:
+            session.close()
+            await asyncio.sleep(0.5)
+            return False
 
     async def fetch_proxies(self):
         """Fetches proxies from api and pushes onto heap"""
         session = aiohttp.ClientSession()
-        while self.running:
-            if any(len(self.proxies[t]) <= self.proxies_required * 5 for t in self.proxies):
-                try:
-                    async with session.get(self.url) as response:
-                        data = await response.text()
-                    proxy = Proxy(**json.loads(data))
-                    seen = True
-                    for t in self.proxies:
-                        if proxy not in self.seen_proxies:
-                            seen = False
-                            heapq.heappush(self.proxies[t], proxy)
-                    if not seen:
-                        self.seen_proxies.append(proxy)
-                    await asyncio.sleep(0.1)
-                except:
-                    session.close()
-                    session = aiohttp.ClientSession()
-                    await asyncio.sleep(0.5)
+        try:
+            while self.running:
+                if any(len(self.proxies[t]) <= self.proxies_required * 2 for t in self.proxies):
+                    n = max(1, min(15, 2 * self.proxies_required - min(*[len(self.proxies[t]) for t in self.proxies])))
+                    results = await asyncio.gather(*[self.fetch_single(session) for _ in range(n)])
+                    if not all(results):
+                        session = aiohttp.ClientSession()
+        finally:
+            session.close()
 
     def run(self):
         loop = asyncio.new_event_loop()

@@ -19,7 +19,7 @@ class WriteWorker(Process):
         self.gym_port = gym_port
         self.send_every = send_every
         self.current_times = [0.] * 6
-        self.topics = sorted(list(Producer.load_query_dictionary('query_topics1.txt').keys()))
+        self.topics = sorted(list(Producer.load_query_dictionary('query_topics.txt').keys()))
         self.file_name = os.path.join(BASE_DIR, 'lib', 'data', 'companyData.csv')
         self.subgroup_types = ['stock', 'reddit', 'twitter', 'article', 'blog']
         self.current_data = {c: {} for c in self.topics}

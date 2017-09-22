@@ -31,7 +31,7 @@ class Item:
 class Producer(Process):
     def __init__(self, port, use_processes=True):
         super(Producer, self).__init__()
-        self.topics = self.load_query_dictionary('query_topics1.txt')
+        self.topics = self.load_query_dictionary('query_topics.txt')
         self.result_queue = Queue()
         self.outgoing = None
         self.port = port

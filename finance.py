@@ -8,15 +8,15 @@ import requests
 from fake_useragent import UserAgent
 
 from base import Producer, Item
-from extensions.proxy import ProxySnatcher
 
 
 class FinanceWorker(Process):
-    def __init__(self, port=6009, send_every=60):
+    def __init__(self, proxy_thread, port=6009, send_every=60):
         super(FinanceWorker, self).__init__()
-        self.topics = Producer.load_query_dictionary('query_topics1.txt')
+        self.topics = Producer.load_query_dictionary('query_topics.txt')
         self.port = port
         self.send_every = send_every
+        self.proxy_thread = proxy_thread
         self.running = True
 
     @staticmethod
@@ -46,21 +46,13 @@ class FinanceWorker(Process):
     def run(self):
         l = connection.Listener(('localhost', self.port), authkey=b'veryscrape')
         outgoing = l.accept()
-        proxy_thread = ProxySnatcher(len(self.topics),
-                                     **{'minDownloadSpeed': '100',
-                                        'protocol': 'http',
-                                        'allowsHttps': 1,
-                                        'allowsUserAgentHeader': 1,
-                                        'allowsCustomHeaders': 1})
-        proxy_thread.start()
         fua = UserAgent()
-        proxy_thread.wait_for_proxies()
         pool = ThreadPoolExecutor(len(self.topics))
         while self.running:
             start = time.time()
             for query in self.topics:
-                proxy = proxy_thread.random('article', True)
+                proxy = self.proxy_thread.random('stock', True)
                 # Submit finance search for each query with random proxy
-                future = pool.submit(self.finance_search, query, proxy, fua.random, proxy_thread)
+                future = pool.submit(self.finance_search, query, proxy, fua.random, self.proxy_thread)
                 future.add_done_callback(lambda f: outgoing.send(f.result()))
             time.sleep(max(0, self.send_every - (time.time() - start)))
