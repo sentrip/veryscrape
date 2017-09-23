@@ -151,6 +151,8 @@ class NewsStream(Process):
                         self.seen.append(url)
                         self.parent.url_queue.put(Item(url, topic, client.source))
                 success = True
+            except requests.exceptions.ChunkedEncodingError:
+                ex = True
             except Exception as e:
                 print(client.name, repr(e))
                 ex = True

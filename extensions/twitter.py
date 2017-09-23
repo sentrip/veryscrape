@@ -67,11 +67,13 @@ class ReadBuffer(AsyncStream):
     async def __anext__(self):
         try:
             chunk = await self.raw.content.read(self.chunk_size)
+        except TimeoutError:
+            raise StopAsyncIteration
         except Exception as e:
-            print('TwitterBuffer' + repr(e))
-            return StopAsyncIteration
+            print('TwitterBuffer', repr(e))
+            raise StopAsyncIteration
         if not chunk:
-            return StopAsyncIteration
+            raise StopAsyncIteration
         self.buffer += chunk
         ind = self.buffer.find(b'\n')
         if ind > -1:
@@ -88,11 +90,12 @@ class ReadBuffer(AsyncStream):
 
 
 class QueryStream(AsyncStream):
-    def __init__(self, auth, topic, query, queue):
+    def __init__(self, auth, topic, query, queue, proxies):
         self.auth = auth
         self.queue = queue
         self.topic = topic
         self.query = query
+        self.proxies = proxies
         self.client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
         self.params = {'language': 'en', 'track': query}
 
@@ -104,9 +107,14 @@ class QueryStream(AsyncStream):
         self.retry_time = self.retry_time_start
         self.snooze_time = self.snooze_time_step
 
+        self.current_proxy = None
+        self.failed = False
+
     async def __anext__(self):
         try:
-            stream = await self.client.request('POST', 'statuses/filter.json', params=self.params)
+            if not self.current_proxy or self.failed:
+                self.current_proxy = await self.proxies.random_async('twitter')
+            stream = await self.client.request('POST', 'statuses/filter.json', params=self.params, proxy=self.current_proxy)
             if stream.status != 200:
                 if stream.status == 420:
                     self.retry_time = max(self.retry_420_start, self.retry_time)
@@ -117,9 +125,11 @@ class QueryStream(AsyncStream):
                 self.snooze_time = self.snooze_time_step
                 await ReadBuffer(stream, self.topic, self.queue).stream()
                 await asyncio.sleep(self.snooze_time)
+                self.failed = False
         except (ClientHttpProxyError, ClientConnectorError, ServerDisconnectedError, ClientOSError):
             await asyncio.sleep(self.retry_time)
         except Exception as e:
+            self.failed = True
             print('Twitter', repr(e))
             self.client.close()
             self.client = AsyncOAuth(*self.auth, 'https://stream.twitter.com/1.1/')
@@ -127,14 +137,15 @@ class QueryStream(AsyncStream):
 
 
 class TweetStream(AsyncStream):
-    def __init__(self, auth, topic, queries, queue):
+    def __init__(self, auth, topic, queries, queue, proxies):
         self.auth = auth
         self.topic = topic
         self.queries = queries
         self.queue = queue
+        self.proxies = proxies
 
     async def __anext__(self):
         jobs = []
         for query in self.queries:
-            jobs.append(QueryStream(self.auth, self.topic, query, self.queue).stream())
+            jobs.append(QueryStream(self.auth, self.topic, query, self.queue, self.proxies).stream())
         await asyncio.gather(*jobs)

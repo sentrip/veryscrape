@@ -59,7 +59,7 @@ class CommentStream(AsyncStream):
             await self.new_session(self.token)
             return {}
 
-    async def get_comments(self, query,**params):
+    async def get_comments(self, query, **params):
         try:
             link_url = self.BASE + '{}/hot.json?{}&raw_json=1&limit=30'.format(query, urlencode(params))
             comment_url = self.BASE + '%s/comments/{}.json?%s&raw_json=1&limit=10000&depth=10' % (query, urlencode(params))

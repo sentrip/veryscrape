@@ -52,6 +52,15 @@ class Proxy:
         return 'Proxy({:7s}, {:.1f})'.format(self.protocol, self.downloadSpeed)
 
 
+async def random_proxy(**params):
+    params.update({'apiKey': '3c6527a27448d2873e2e4cd0114c202bfd0ff58f'})
+    url = 'https://api.getproxylist.com/proxy?anonymity=high%20anonymity&' + urlencode(params)
+    async with aiohttp.ClientSession() as session:
+        async with session.request('GET', url) as response:
+            j = await response.json()
+    return '{}://{}:{}'.format(j['protocol'], j['ip'], j['port'])
+
+
 class ProxySnatcher(Thread):
     def __init__(self, proxies_required=10, **params):
         super(ProxySnatcher, self).__init__()
@@ -60,23 +69,24 @@ class ProxySnatcher(Thread):
             key = f.read()
         params.update({'apiKey': key})
         self.url = 'https://api.getproxylist.com/proxy?anonymity=high%20anonymity&' + urlencode(params)
-        self.proxies = {'article': [], 'stock': []}
+        self.proxies = {'article': [], 'stock': [], 'twitter': []}
         self.seen_proxies = deque(maxlen=proxies_required*10)
+        self.session = None
         self.running = True
 
     def random(self, proxy_type, return_dict=False):
         """Returns random proxy that was not used recently"""
         while len(self.proxies[proxy_type]) == 0:
             sleep(0.01)
-        random_proxy = heapq.heappop(self.proxies[proxy_type])
-        return random_proxy.proxy_dict if return_dict else random_proxy.full_address
+        p = heapq.heappop(self.proxies[proxy_type])
+        return p.proxy_dict if return_dict else p.full_address
 
     async def random_async(self, proxy_type, return_dict=False):
         """Returns random proxy that was not used recently"""
         while len(self.proxies[proxy_type]) == 0:
-            await asyncio.sleep(0.01)
-        random_proxy = heapq.heappop(self.proxies[proxy_type])
-        return random_proxy.proxy_dict if return_dict else random_proxy.full_address
+            await asyncio.sleep(1)
+        p = heapq.heappop(self.proxies[proxy_type])
+        return p.proxy_dict if return_dict else p.full_address
 
     def wait_for_proxies(self):
         print('Now waiting to acquire proxies...')
@@ -85,36 +95,36 @@ class ProxySnatcher(Thread):
             print('Currently have {}/{}'.format(len(self.proxies['article']), self.proxies_required*2))
         print('Proxies acquired, now initializing streams...')
 
-    async def fetch_single(self, session):
+    async def fetch_single(self):
         try:
-            async with session.get(self.url) as response:
+            async with self.session.get(self.url) as response:
                 data = await response.text()
-            proxy = Proxy(**json.loads(data))
+        except:
+            data = {}
+            self.session.close()
+            await asyncio.sleep(0.5)
+            self.session = aiohttp.ClientSession()
+        if data:
             seen = True
+            proxy = Proxy(**json.loads(data))
             for t in self.proxies:
                 if proxy not in self.seen_proxies:
                     seen = False
                     heapq.heappush(self.proxies[t], proxy)
             if not seen:
                 self.seen_proxies.append(proxy)
-            return True
-        except:
-            session.close()
-            await asyncio.sleep(0.5)
-            return False
 
     async def fetch_proxies(self):
         """Fetches proxies from api and pushes onto heap"""
-        session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession()
         try:
             while self.running:
                 if any(len(self.proxies[t]) <= self.proxies_required * 2 for t in self.proxies):
                     n = max(1, min(15, 2 * self.proxies_required - min(*[len(self.proxies[t]) for t in self.proxies])))
-                    results = await asyncio.gather(*[self.fetch_single(session) for _ in range(n)])
-                    if not all(results):
-                        session = aiohttp.ClientSession()
+                    await asyncio.gather(*[self.fetch_single() for _ in range(n)])
         finally:
-            session.close()
+            if not self.session.closed:
+                self.session.close()
 
     def run(self):
         loop = asyncio.new_event_loop()

@@ -3,7 +3,7 @@ import datetime
 import os
 import time
 from collections import defaultdict
-from multiprocessing import Process, Queue
+from multiprocessing import Queue, Process
 from multiprocessing.connection import Client, Listener
 from threading import Thread
 
@@ -34,18 +34,19 @@ class WriteWorker(Process):
     def save_incoming(self, incoming):
         """Receives item from queue and writes item data into appropriate data set and saves if required"""
         while self.running:
-            item = incoming.recv()
-            self.current_data[item.topic][item.source] = item.content
-            self.gym_queue.put(item)
+            if incoming.poll():
+                item = incoming.recv()
+                self.current_data[item.topic][item.source] = item.content
+                self.gym_queue.put(item)
 
-            if self.ready_to_save:
-                time_string = '{:4d}-{:2d}-{:2d}|{:2d}:{:2d}:{:2d}'.format(*self.current_times).replace(' ','0').replace('|', ' ')
-                data_string = ','.join(','.join('{}'.format(self.current_data[c][sg]) for sg in self.subgroup_types) for c in self.topics)
-                with self.file_lock:
+            with self.file_lock:
+                if self.ready_to_save:
+                    time_string = '{:4d}-{:2d}-{:2d}|{:2d}:{:2d}:{:2d}'.format(*self.current_times).replace(' ','0').replace('|', ' ')
+                    data_string = ','.join(','.join('{}'.format(self.current_data[c][sg]) for sg in self.subgroup_types) for c in self.topics)
                     with open(self.file_name, 'a') as f:
                         f.write('{},{}\n'.format(time_string, data_string))
-                self.current_data = {c: {} for c in self.topics}
-                print('Wrote to disk at {}'.format(time_string))
+                    self.current_data = {c: {} for c in self.topics}
+                    print('Wrote to disk at {}'.format(time_string))
 
     def send_to_gym(self, gym_queue):
         """Consumes items from gym queue and sends complete dictionary of a single time snapshot to gym environment"""

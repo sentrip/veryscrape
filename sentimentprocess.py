@@ -1,8 +1,6 @@
 # Class to pre-process incoming text data and prepare for feeding into neural network
 import os
 import time
-from collections import defaultdict
-from functools import partial
 from multiprocessing import Process, Queue
 from multiprocessing.connection import Client, Listener
 from threading import Thread
@@ -10,7 +8,7 @@ from threading import Thread
 import numpy as np
 import tensorflow as tf
 
-from base import BASE_DIR, Item
+from base import BASE_DIR, Item, Producer
 from neural_network_models.sentiment.model import Model
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -26,13 +24,14 @@ class SentimentWorker(Process):
         self.incoming_port, self.outgoing_port = incoming_port, outgoing_port
 
         self.types = ['reddit', 'twitter', 'article', 'blog']
-        self.current_sentiments = defaultdict(partial(defaultdict, list))
-        self.last_sentiments = defaultdict(partial(defaultdict, float))
+        self.topics = sorted(list(Producer.load_query_dictionary('query_topics.txt')))
+        self.current_sentiments = {t: {q: [] for q in self.types} for t in self.topics}
+        self.last_sentiments = {t: {q: 0.0 for q in self.types} for t in self.topics}
         self.running = True
 
     def send_to_parent(self, outgoing):
         """Averages collected sentiments, sends averaged value to output queue and resets lists"""
-        for q in self.current_sentiments:
+        for q in self.topics:
             for t in self.types:
                 avg = float(sum(self.current_sentiments[q][t])) / max(1, len(self.current_sentiments[q][t]))
                 self.last_sentiments[q][t] = avg if avg != 0 else self.last_sentiments[q][t]
@@ -65,15 +64,16 @@ class SentimentWorker(Process):
         Thread(target=self.calculate_sentiments_from_queue, args=(sess, model, batch_queue,)).start()
         place_in_queue = time.time()
         while self.running:
-            item = incoming.recv()
-            items.append(item)
-            if len(items) >= self.batch_size or (time.time() - place_in_queue >= 1 and len(items) > 0):
-                batch_queue.put(items)
-                items = []
-                place_in_queue = time.time()
             # Send results to parent if time
             now = time.time()
             if now - start_time >= self.send_every:
                 self.send_to_parent(outgoing)
                 start_time = now
+            if incoming.poll():
+                item = incoming.recv()
+                items.append(item)
+                if len(items) >= self.batch_size or (time.time() - place_in_queue >= 1 and len(items) > 0):
+                    batch_queue.put(items)
+                    items = []
+                    place_in_queue = time.time()
         sess.close()
