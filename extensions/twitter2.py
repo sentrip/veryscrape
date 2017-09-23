@@ -11,7 +11,6 @@ import aiohttp
 import aiohttp.client_exceptions as aex
 
 from base import Item
-from extensions.proxy import random_proxy
 
 random = SystemRandom().random
 
@@ -134,8 +133,8 @@ class QueryStream:
         self.client = AsyncOAuth(*self.auth, 'https://stream.twitter.com/1.1/')
         async for retry_count in self.retry_counter:
             try:
-                proxy = await random_proxy(**self.proxy_params)
-                self.raw = await self.client.request('POST', 'statuses/filter.json', params=self.params, proxy=proxy)
+                #proxy = await random_proxy(**self.proxy_params)
+                self.raw = await self.client.request('POST', 'statuses/filter.json', params=self.params)#, proxy=proxy)
                 if self.raw.status == 420:
                     await asyncio.sleep(self.retry_420)
                 elif self.raw.status != 200:

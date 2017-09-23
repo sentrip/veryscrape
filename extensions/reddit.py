@@ -96,7 +96,7 @@ class CommentStream(AsyncStream):
             self.infinite_queries = iter(self.queries)
             q = next(self.infinite_queries)
 
-        for link, time_created in list(self.links[q].items()):
+        for link, time_created in self.links[q].items():
             if time.time() - time_created >= 2 * 24 * 3600:
                 del self.links[q][link]
 
