@@ -1,6 +1,5 @@
 import asyncio
 import json
-import random as rd
 import re
 import time
 from hashlib import sha1
@@ -8,27 +7,12 @@ from random import SystemRandom
 
 import aioauth_client
 import aiohttp
-import aiohttp.client_exceptions as aex
+from aiohttp.client_exceptions import ClientError, ServerDisconnectedError, ClientPayloadError, TimeoutError as Timeout
 
-from base import Item
+from src.base import Item, AsyncStream
+from src.extensions.proxy import random_proxy
 
 random = SystemRandom().random
-
-
-class RandomExponentialBackOff:
-    def __init__(self):
-        self.count = 0
-        self.retry_time = 1
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        if self.count:
-            await asyncio.sleep(self.retry_time + self.retry_time / 4 - rd.random() * self.retry_time / 2)
-            self.retry_time *= 2
-        self.count += 1
-        return self.count
 
 
 class AsyncOAuth(aioauth_client.Client):
@@ -46,9 +30,11 @@ class AsyncOAuth(aioauth_client.Client):
         self.consumer_secret = consumer_secret
         self.params = params
         self.signature = signature or aioauth_client.HmacSha1Signature()
-        self.sess = aiohttp.ClientSession()
+        self.sess = None
 
     async def request(self, method, url, params=None, headers=None, timeout=10, loop=None, **aio_kwargs):
+        if not self.sess:
+            self.sess = aiohttp.ClientSession()
         oparams = {
             'oauth_consumer_key': self.consumer_key,
             'oauth_nonce': sha1(str(random()).encode('ascii')).hexdigest(),
@@ -69,7 +55,7 @@ class AsyncOAuth(aioauth_client.Client):
         self.sess.close()
 
 
-class ReadBuffer:
+class ReadBuffer(AsyncStream):
     def __init__(self, stream, topic, queue, chunk_size=1024):
         enc_search = re.search('charset=(?P<enc>\S*)', stream.headers.get('content-type', default=''))
         self.encoding = enc_search.group('enc') if enc_search is not None else 'utf-8'
@@ -79,20 +65,17 @@ class ReadBuffer:
         self.chunk_size = chunk_size
         self.raw = stream
 
-    def __aiter__(self):
-        return self
-
     async def __anext__(self):
         chunk = None
         try:
             chunk = await self.raw.content.read(self.chunk_size)
-        except (aex.TimeoutError, aex.ClientPayloadError):
+        except (Timeout, ClientPayloadError):
             pass
         except Exception as e:
             print('TwitterBuffer', repr(e))
         finally:
             if not chunk:
-                return StopAsyncIteration
+                raise StopAsyncIteration
 
         self.buffer += chunk
         ind = self.buffer.find(b'\n')
@@ -103,51 +86,69 @@ class ReadBuffer:
                 if 'limit' in s:
                     sleep_time = (float(s['limit']['track']) + float(
                         s['limit']['timestamp_ms'])) / 1000 - time.time()
-                    await asyncio.sleep(sleep_time * 2)
+                    await asyncio.sleep(sleep_time)
                 else:
                     self.queue.put(Item(s['text'], self.topic, 'twitter'))
         return
 
 
-class QueryStream:
+class QueryStream(AsyncStream):
     def __init__(self, auth, topic, query, queue):
         self.auth = auth
         self.queue = queue
         self.topic = topic
         self.query = query
-        self.client = None
+        self.client = AsyncOAuth(*auth, 'https://stream.twitter.com/1.1/')
         self.params = {'language': 'en', 'track': query}
 
-        self.retry_420 = 60.0
-        self.retry_time = 5.0
-        self.snooze_time = 0.25
+        self.retry_time_start = 5.0
+        self.retry_420_start = 60.0
+        self.retry_time_cap = 320.0
+        self.snooze_time_step = 0.25
+        self.snooze_time_cap = 16
+        self.retry_time = self.retry_time_start
+        self.snooze_time = self.snooze_time_step
 
-        self.retry_counter = RandomExponentialBackOff()
-        self.buffer = None
-        self.raw = None
-        self.is_streaming = False
-        self.is_reading = False
+        self.proxy = None
+        self.failed = False
         self.proxy_params = {'minDownloadSpeed': '50', 'protocol': 'http', 'allowsHttps': 1, 'allowsPost': 1}
 
-    async def stream(self):
-        self.client = AsyncOAuth(*self.auth, 'https://stream.twitter.com/1.1/')
-        async for retry_count in self.retry_counter:
-            try:
-                #proxy = await random_proxy(**self.proxy_params)
-                self.raw = await self.client.request('POST', 'statuses/filter.json', params=self.params)#, proxy=proxy)
-                if self.raw.status == 420:
-                    await asyncio.sleep(self.retry_420)
-                elif self.raw.status != 200:
-                    await asyncio.sleep(self.retry_time)
-                else:
-                    self.retry_counter.count = 0
-                    async for _ in ReadBuffer(self.raw, self.topic, self.queue):
-                        pass
-            except (aex.ServerDisconnectedError, aex.ClientResponseError, aex.ClientHttpProxyError, aex.ClientOSError,
-                    aex.ClientConnectorError, aex.ClientProxyConnectionError):
-                self.client.close()
-                self.client = AsyncOAuth(*self.auth, 'https://stream.twitter.com/1.1/')
-            except Exception as e:
-                print('Twitter', repr(e))
-                self.client.close()
-                self.client = AsyncOAuth(*self.auth, 'https://stream.twitter.com/1.1/')
+    async def __anext__(self):
+        try:
+            if not self.proxy or self.failed:
+                self.proxy = await random_proxy(**self.proxy_params)
+            stream = await self.client.request('POST', 'statuses/filter.json', params=self.params, proxy=self.proxy)
+            if stream.status != 200:
+                if stream.status == 420:
+                    self.retry_time = max(self.retry_420_start, self.retry_time)
+                await asyncio.sleep(self.retry_time)
+                self.retry_time = min(self.retry_time * 2., self.retry_time_cap)
+            else:
+                self.retry_time = self.retry_time_start
+                self.snooze_time = self.snooze_time_step
+                await ReadBuffer(stream, self.topic, self.queue).stream()
+                await asyncio.sleep(self.snooze_time)
+                self.failed = False
+        except (ClientError, ServerDisconnectedError, Timeout):
+            await asyncio.sleep(self.retry_time)
+        except Exception as e:
+            self.failed = True
+            print('Twitter', repr(e))
+            self.client.close()
+            self.client = AsyncOAuth(*self.auth, 'https://stream.twitter.com/1.1/')
+            await asyncio.sleep(self.retry_time)
+        return
+
+
+class TweetStream(AsyncStream):
+    def __init__(self, auth, topic, queries, queue):
+        self.auth = auth
+        self.topic = topic
+        self.queries = queries
+        self.queue = queue
+
+    async def __anext__(self):
+        jobs = []
+        for query in self.queries:
+            jobs.append(QueryStream(self.auth, self.topic, query, self.queue).stream())
+        await asyncio.gather(*jobs)

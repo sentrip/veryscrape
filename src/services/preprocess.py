@@ -12,7 +12,7 @@ from lxml import html
 from newspaper import Config, extractors, cleaners, outputformatters
 from nltk.tokenize import sent_tokenize, wordpunct_tokenize
 
-from base import BASE_DIR, Item
+from src.base import BASE_DIR, Item
 
 
 def load_vocab(base_directory):

@@ -3,27 +3,28 @@ from multiprocessing.connection import Client
 
 if __name__ == '__main__':
     import time
-    from preprocess import PreProcessWorker
-    from sentimentprocess import SentimentWorker
-    from stream import StreamWorker
+    from src.services.finance import FinanceWorker2
     from threading import Thread
 
     send_every = 10
-    port = 6000
+    port = 6009
 
-    s = StreamWorker(use_processes=True)
-    s.start()
+    f = FinanceWorker2(send_every=10)
+    f.start()
     time.sleep(1)
+    # s = StreamWorker(use_processes=True)
+    # s.start()
+    # time.sleep(1)
 
-    p = PreProcessWorker()
-    p.start()
-    port += 1
-    time.sleep(1)
-
-    st = SentimentWorker(send_every=send_every)
-    st.start()
-    port += 1
-    time.sleep(1)
+    # p = PreProcessWorker()
+    # p.start()
+    # port += 1
+    # time.sleep(1)
+    #
+    # st = SentimentWorker(send_every=send_every)
+    # st.start()
+    # port += 1
+    # time.sleep(1)
 
     c = Client(('localhost', port), authkey=b'veryscrape')
     # items = []

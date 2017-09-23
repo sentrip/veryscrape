@@ -8,8 +8,8 @@ from threading import Thread
 import numpy as np
 import tensorflow as tf
 
-from base import BASE_DIR, Item, Producer
-from neural_network_models.sentiment.model import Model
+from src.base import BASE_DIR, Item, Producer
+from src.extensions.sentiment_model import Model
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 

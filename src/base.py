@@ -19,7 +19,8 @@ class Item:
         self.source = source
 
     def __repr__(self):
-        return "Item({:5s}, {:7s}, {})".format(self.topic, self.source, str(self.content)[:10])
+        printable_content = str(self.content)[:15].replace('\n', '').replace('\r', '').replace('\t', '')
+        return "Item({:5s}, {:7s}, {:15s})".format(self.topic, self.source, printable_content)
 
     def __hash__(self):
         return hash(str(self.content) + self.topic + self.source)
@@ -31,7 +32,6 @@ class Item:
 class Producer(Process):
     def __init__(self, port, use_processes=True):
         super(Producer, self).__init__()
-        self.topics = self.load_query_dictionary('query_topics.txt')
         self.result_queue = Queue()
         self.outgoing = None
         self.port = port
@@ -79,6 +79,26 @@ class Producer(Process):
                 self.W(target=self.run_in_loop, args=(set_of_jobs,)).start()
         while self.running:
             self.outgoing.send(self.result_queue.get())
+
+
+class ExponentialBackOff:
+    def __init__(self, ratio=2):
+        self.ratio = ratio
+        self.count = 0
+        self.retry_time = 1
+
+    def reset(self):
+        self.count = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.count:
+            await asyncio.sleep(self.retry_time)
+            self.retry_time *= self.ratio
+        self.count += 1
+        return self.count
 
 
 class AsyncStream:
