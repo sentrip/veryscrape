@@ -1,32 +1,53 @@
 import asyncio
 import os
+import re
+from collections import namedtuple
 from multiprocessing import Process, Queue
 from multiprocessing.connection import Listener
 from random import shuffle
 from threading import Thread
 
-
 BASE_DIR = "/home/djordje/Sentrip/"
 if not os.path.isdir(BASE_DIR):
     BASE_DIR = "C:/users/djordje/desktop"
+Item = namedtuple('Item', ['content', 'topic', 'source'])
+Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
 
 
-class Item:
-    """General container for text/numerical/vector data categorized by topic and source"""
-    def __init__(self, content='', topic='', source=''):
-        self.content = content
-        self.topic = topic
-        self.source = source
+class ExponentialBackOff:
+    def __init__(self, ratio=2):
+        self.ratio = ratio
+        self.count = 0
+        self.retry_time = 1
 
-    def __repr__(self):
-        printable_content = str(self.content)[:15].replace('\n', '').replace('\r', '').replace('\t', '')
-        return "Item({:5s}, {:7s}, {:15s})".format(self.topic, self.source, printable_content)
+    def reset(self):
+        self.count = 0
 
-    def __hash__(self):
-        return hash(str(self.content) + self.topic + self.source)
+    def __aiter__(self):
+        return self
 
-    def __eq__(self, other):
-        return self.content == other.content
+    async def __anext__(self):
+        if self.count:
+            await asyncio.sleep(self.retry_time)
+            self.retry_time *= self.ratio
+        self.count += 1
+        return self.count
+
+
+class AsyncStream:
+
+    def __aiter__(self):
+        return self
+
+    def __anext__(self):
+        return
+
+    async def stream(self):
+        while True:
+            try:
+                await self.__anext__()
+            except StopAsyncIteration:
+                break
 
 
 class Producer(Process):
@@ -79,39 +100,3 @@ class Producer(Process):
                 self.W(target=self.run_in_loop, args=(set_of_jobs,)).start()
         while self.running:
             self.outgoing.send(self.result_queue.get())
-
-
-class ExponentialBackOff:
-    def __init__(self, ratio=2):
-        self.ratio = ratio
-        self.count = 0
-        self.retry_time = 1
-
-    def reset(self):
-        self.count = 0
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        if self.count:
-            await asyncio.sleep(self.retry_time)
-            self.retry_time *= self.ratio
-        self.count += 1
-        return self.count
-
-
-class AsyncStream:
-
-    def __aiter__(self):
-        return self
-
-    def __anext__(self):
-        return
-
-    async def stream(self):
-        while True:
-            try:
-                await self.__anext__()
-            except StopAsyncIteration:
-                break
