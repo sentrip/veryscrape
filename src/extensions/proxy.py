@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 import aiohttp
 import requests
 
-from src.base import BASE_DIR
+from src.base import BASE_DIR, ExponentialBackOff
 
 
 def get_key():
@@ -16,17 +16,31 @@ def get_key():
 async def random_proxy(**params):
     params.update({'apiKey': get_key()})
     url = 'https://api.getproxylist.com/proxy?anonymity=high%20anonymity&' + urlencode(params)
-    async with aiohttp.ClientSession() as session:
-        async with session.request('GET', url) as response:
-            j = await response.json()
-    return '{}://{}:{}'.format(j['protocol'], j['ip'], j['port'])
+    retry_counter = ExponentialBackOff(1)
+    async for _ in retry_counter:
+        async with aiohttp.ClientSession() as session:
+            async with session.request('GET', url) as response:
+                try:
+                    j = await response.json()
+                    return '{}://{}:{}'.format(j['protocol'], j['ip'], j['port'])
+                except aiohttp.client_exceptions.ClientError:
+                    pass
+                except Exception as e:
+                    print('Proxy', repr(e))
 
 
 def random_proxy_sync(**params):
     params.update({'apiKey': get_key()})
-    url = 'https://api.getproxylist.com/proxy?anonymity=high%20anonymity&' + urlencode(params)
-    j = requests.get(url).json()
-    return {'https' if j['allowsHttps'] else 'http':'{}://{}:{}'.format(j['protocol'], j['ip'], j['port'])}
+    while True:
+        url = 'https://api.getproxylist.com/proxy?anonymity=high%20anonymity&' + urlencode(params)
+        try:
+            j = requests.get(url).json()
+            return {'https' if j['allowsHttps'] else 'http': '{}://{}:{}'.format(j['protocol'], j['ip'], j['port'])}
+        except requests.exceptions.ConnectionError:
+            pass
+        except Exception as e:
+            print('Proxy', repr(e))
+
 
 # import asyncio
 # import heapq

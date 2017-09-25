@@ -35,14 +35,19 @@ class FinanceWorker(Process):
         search_url = "http://www.google.com/finance?&q=" + query
         resp, stock_price = '', 0.0
         ex = False
-        while not resp:
+        count = 0
+        while not resp and count < 100:
             try:
                 resp = requests.get(search_url, proxies=proxy if not ex else random_proxy_sync(**self.proxy_params),
-                                    headers={'User-Agent': user_agent})
+                                    headers={'User-Agent': user_agent}, timeout=3)
                 stock_price = self. extract_stock(resp.text)
-            except Exception as e:
-                print('Finance', e)
+            except (TimeoutError, requests.exceptions.ConnectionError):
                 ex = True
+                count += 1
+            except Exception as e:
+                print('Finance', repr(e))
+                ex = True
+                count += 1
         return Item(content=stock_price, topic=query, source='stock')
 
     def run(self):

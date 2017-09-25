@@ -1,8 +1,9 @@
 import time
 from threading import Thread, Lock
+from multiprocessing import Queue
 
 # stages: f - Finance, t - Stream, p - PreProcess, s - Sentiment, w - Write
-stages = 't'
+stages = 'tps'
 send_every = 10
 port = 6000
 
@@ -10,7 +11,7 @@ port = 6000
 if __name__ == '__main__':
     if 't' in stages:
         from src.services.stream import StreamWorker
-        s = StreamWorker(use_processes=False)
+        s = StreamWorker(use_processes=True)
         s.start()
         time.sleep(1)
     if 'p' in stages:
@@ -20,9 +21,12 @@ if __name__ == '__main__':
         port += 1
         time.sleep(1)
     if 's' in stages:
-        from src.services.sentimentprocess import SentimentWorker
-        st = SentimentWorker(send_every=send_every)
+        from src.services.sentimentprocess import SentimentAverage, SentimentWorker
+        sent_queue = Queue()
+        st = SentimentWorker(sent_queue)
         st.start()
+        sa = SentimentAverage(sent_queue, send_every=send_every)
+        sa.start()
         port += 1
         time.sleep(1)
     if 'f' in stages:
@@ -44,3 +48,6 @@ if __name__ == '__main__':
             print(i)
     if 'w' not in stages:
         Thread(target=print_stuff).start()
+
+"""Reddit ClientConnectorError(110, "Cannot connect to host oauth.reddit.com:443 ssl:True [Can not connect to oauth.reddit.com:443 [Connect call failed ('151.101.61.140', 443)]]"
+"""

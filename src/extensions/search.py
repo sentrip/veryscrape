@@ -3,6 +3,7 @@ import asyncio
 import os
 import re
 import time
+import ssl
 from collections import deque
 from queue import Empty
 from urllib.parse import urlencode
@@ -37,7 +38,7 @@ class DownloadStream:
             except aiohttp.client_exceptions.ClientError:
                 self.session.close()
                 self.session = aiohttp.ClientSession()
-            except (aiohttp.client_exceptions.TimeoutError, KeyError):
+            except (aiohttp.client_exceptions.TimeoutError, ssl.CertificateError, KeyError):
                 pass
             except UnicodeDecodeError:
                 break

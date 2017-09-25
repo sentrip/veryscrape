@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 import aiohttp
 
-from src.base import Item, AsyncStream
+from src.base import Item, AsyncStream, ExponentialBackOff
 
 
 class CommentStream(AsyncStream):
@@ -30,6 +30,7 @@ class CommentStream(AsyncStream):
         self.token = None
         self.expiry_time = 0
         self.rate_limit = 60
+        self.retry_counter = ExponentialBackOff()
 
     async def new_session(self, token=None):
         if self.session:
@@ -40,28 +41,31 @@ class CommentStream(AsyncStream):
                 async with client.post(self.TOKEN_URL, data={'grant_type': 'client_credentials'}) as response:
                     j = await response.json()
                     self.token = j['access_token']
-                    head.update({'Authorization': 'bearer ' + self.token})
+                    head.update({'Authorization': 'Bearer ' + self.token})
         else:
-            head.update({'Authorization': 'bearer ' + token})
+            head.update({'Authorization': 'Bearer ' + token})
         self.session = aiohttp.ClientSession(headers=head)
         self.expiry_time = time.time() + 3598
 
     async def fetch_json(self, url):
-        if self.rate_limit <= 0:
-            await asyncio.sleep(1)
-        self.rate_limit -= 1
-        try:
-            async with self.session.get(url) as response:
-                data = await response.json()
-            return data
-        except Exception as e:
-            print('Reddit', repr(e))
-            await self.new_session(self.token)
-            return {}
+        async for _ in self.retry_counter:
+            if self.rate_limit <= 0:
+                await asyncio.sleep(max(abs(min(1, self.rate_limit)), 1))
+            self.rate_limit -= 1
+            try:
+                async with self.session.get(url) as response:
+                    data = await response.json()
+                self.retry_counter.reset()
+                return data
+            except aiohttp.client_exceptions.ClientConnectorError:
+                await self.new_session(self.token)
+            except Exception as e:
+                print('Reddit', repr(e))
+                await self.new_session(self.token)
 
     async def get_comments(self, query, **params):
         try:
-            link_url = self.BASE + '{}/hot.json?{}&raw_json=1&limit=30'.format(query, urlencode(params))
+            link_url = self.BASE + '{}/rising.json?{}&raw_json=1&limit=30'.format(query, urlencode(params))
             comment_url = self.BASE + '%s/comments/{}.json?%s&raw_json=1&limit=10000&depth=10' % (query, urlencode(params))
             j = await self.fetch_json(link_url)
             links = {i['data']['id']: i['data']['created_utc'] for i in j['data']['children']}

@@ -15,11 +15,11 @@ def get_n(df, t):
 def display():
     with open(os.path.join(BASE_DIR, 'lib', 'data', 'companyData.csv'), 'r') as f:
         df = pd.read_csv(f, header=[0, 1], index_col=0)
-    print('Article', 'Blog   ', 'Reddit ', 'Twitter: ')
-    print(get_n(df, 'article'), get_n(df, 'blog'), get_n(df, 'reddit'), get_n(df, 'twitter'))
+    print('Article', 'Blog   ', 'Reddit ', 'Twitter', 'Stock  ')
+    print(get_n(df, 'article'), get_n(df, 'blog'), get_n(df, 'reddit'), get_n(df, 'twitter'), get_n(df, 'stock'))
     print()
 
 
 while True:
     display()
-    time.sleep(10)
+    time.sleep(15)

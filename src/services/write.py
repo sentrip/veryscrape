@@ -22,16 +22,18 @@ class WriteWorker(Process):
         self.topics = sorted(list(Producer.load_query_dictionary('query_topics.txt').keys()))
         self.file_name = os.path.join(BASE_DIR, 'lib', 'data', 'companyData.csv')
         self.subgroup_types = ['stock', 'reddit', 'twitter', 'article', 'blog']
-        self.current_data = {c: {} for c in self.topics}
+        self.current_data = {c: {sg: 0. for sg in self.subgroup_types} for c in self.topics}
         self.gym_queue = Queue()
         self.running = True
+        self.clock = time.time()
 
     @property
     def ready_to_save(self):
         """Returns whether current_data contains enough data for saving to disk"""
-        return sum(len(i) for c, i in self.current_data.items()) == len(self.topics) * len(self.subgroup_types)
+        return time.time() - self.clock >= self.send_every
+        #return sum(len(i) for c, i in self.current_data.items()) == len(self.topics) * len(self.subgroup_types)
 
-    def save_incoming(self, incoming):
+    def save_incoming(self, incoming, allowed_to_save=True):
         """Receives item from queue and writes item data into appropriate data set and saves if required"""
         while self.running:
             if incoming.poll():
@@ -39,14 +41,15 @@ class WriteWorker(Process):
                 self.current_data[item.topic][item.source] = item.content
                 self.gym_queue.put(item)
 
-            with self.file_lock:
-                if self.ready_to_save:
-                    time_string = '{:4d}-{:2d}-{:2d}|{:2d}:{:2d}:{:2d}'.format(*self.current_times).replace(' ','0').replace('|', ' ')
-                    data_string = ','.join(','.join('{}'.format(self.current_data[c][sg]) for sg in self.subgroup_types) for c in self.topics)
+            if self.ready_to_save and allowed_to_save:
+                time_string = '{:4d}-{:2d}-{:2d}|{:2d}:{:2d}:{:2d}'.format(*self.current_times).replace(' ','0').replace('|', ' ')
+                data_string = ','.join(','.join(str(self.current_data[c][sg]) for sg in self.subgroup_types) for c in self.topics)
+                with self.file_lock:
                     with open(self.file_name, 'a') as f:
                         f.write('{},{}\n'.format(time_string, data_string))
-                    self.current_data = {c: {} for c in self.topics}
-                    print('Wrote to disk at {}'.format(time_string))
+                self.current_data = {c: {sg: 0. for sg in self.subgroup_types} for c in self.topics}
+                print('Wrote to disk at {}'.format(time_string))
+                self.clock += self.send_every
 
     def send_to_gym(self, gym_queue):
         """Consumes items from gym queue and sends complete dictionary of a single time snapshot to gym environment"""
@@ -69,8 +72,8 @@ class WriteWorker(Process):
                 f.write('company_name,' + ','.join([','.join([c]*len(self.subgroup_types)) for c in self.topics]) + '\n')
                 f.write('time,' + ','.join([','.join(self.subgroup_types)]*len(self.topics)) + '\n')
 
-        Thread(target=self.save_incoming, args=(stock, )).start()
-        Thread(target=self.save_incoming, args=(sentiment, )).start()
+        Thread(target=self.save_incoming, args=(sentiment, True, )).start()
+        Thread(target=self.save_incoming, args=(stock, False,)).start()
         Thread(target=self.send_to_gym, args=(gym_queue,)).start()
 
         while self.running:

@@ -1,13 +1,15 @@
 if __name__ == '__main__':
     import time
     from threading import Lock
+    from multiprocessing import Queue
     from src.services.finance import FinanceWorker
     from src.services.preprocess import PreProcessWorker
-    from src.services.sentimentprocess import SentimentWorker
+    from src.services.sentimentprocess import SentimentWorker, SentimentAverage
     from src.services.stream import StreamWorker
     from src.services.write import WriteWorker
-    send_every = 60
+    send_every = 15
     file_lock = Lock()
+    sent_queue = Queue()
 
     f = FinanceWorker(send_every=send_every)
     f.start()
@@ -21,9 +23,10 @@ if __name__ == '__main__':
     p.start()
     time.sleep(1)
 
-    st = SentimentWorker(send_every=send_every)
+    st = SentimentWorker(sent_queue)
     st.start()
-    time.sleep(1)
+    sa = SentimentAverage(sent_queue, send_every=send_every)
+    sa.start()
 
     w = WriteWorker(file_lock, send_every=send_every)
     w.start()

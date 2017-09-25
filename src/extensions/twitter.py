@@ -129,7 +129,11 @@ class QueryStream(AsyncStream):
                 await ReadBuffer(stream, self.topic, self.queue).stream()
                 await asyncio.sleep(self.snooze_time)
                 self.failed = False
-        except (ClientError, ServerDisconnectedError, Timeout):
+        except ClientError:
+            self.client.close()
+            self.client = AsyncOAuth(*self.auth, 'https://stream.twitter.com/1.1/')
+            await asyncio.sleep(self.retry_time)
+        except (ServerDisconnectedError, Timeout):
             await asyncio.sleep(self.retry_time)
         except Exception as e:
             self.failed = True

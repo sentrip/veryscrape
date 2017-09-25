@@ -9,6 +9,7 @@ from multiprocessing.connection import Listener, Client
 import numpy as np
 from gensim.models import Word2Vec
 from lxml import html
+import lxml
 from newspaper import Config, extractors, cleaners, outputformatters
 from nltk.tokenize import sent_tokenize, wordpunct_tokenize
 
@@ -27,19 +28,18 @@ def load_vocab(base_directory):
 
 def clean_tweet(item):
     """Unescapes and replaces mentions and hashtags with static tokens (@ - MENTION, # - HASHTAG)"""
-    item.content = unescape(item.content)
-    item.content = re.sub(r'(^|[^0-9&]+)([#\uff03]+)([A-Za-z0-9_\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u00ff]*)([#\uff03]*)',
-                          ' HASHTAG ', item.content)
-    item.content = re.sub(r'(RT(\x20)?(:)?)?(?<=^|(?<=[^a-zA-Z0-9-_.]))*(@)+([A-Za-z0-9_]+[A-Za-z0-9_]+)',
-                          ' MENTION ', item.content)
-    return item
+    content = unescape(item.content)
+    content = re.sub(r'(^|[^0-9&]+)([#\uff03]+)([A-Za-z0-9_\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u00ff]*)([#\uff03]*)',
+                          ' HASHTAG ', content)
+    content = re.sub(r'(RT(\x20)?(:)?)?(?<=^|(?<=[^a-zA-Z0-9-_.]))*(@)+([A-Za-z0-9_]+[A-Za-z0-9_]+)', ' MENTION ', content)
+    return Item(content, item.topic, item.source)
 
 
 def clean_reddit_comment(item):
     """Replace subreddit paths and user paths with static tokens (/r/... - SUBREDDIT, /u/ MENTION) """
-    item.content = re.sub(r'<.*?>', '', item.content)
-    item.content = re.sub(r'((\[deleted])|(\[removed])|(\[not found]))?', '', item.content)
-    return item
+    content = re.sub(r'<.*?>', '', item.content)
+    content = re.sub(r'((\[deleted])|(\[removed])|(\[not found]))?', '', content)
+    return Item(content, item.topic, item.source)
 
 
 def clean_article(item):
@@ -50,21 +50,21 @@ def clean_article(item):
     extractor = extractors.ContentExtractor(config)
     clean_doc = cleaners.DocumentCleaner(config).clean(html.fromstring(item.content))
     top_node = extractor.post_cleanup(extractor.calculate_best_node(clean_doc))
-    item.content, _ = outputformatters.OutputFormatter(config).get_formatted(top_node)
-    return item
+    content, _ = outputformatters.OutputFormatter(config).get_formatted(top_node)
+    return Item(content, item.topic, item.source)
 
 
 def clean_general(item):
     """Remove any urls, non-ascii text and redundant spaces, normalize swearwords"""
     # Urls
-    item.content = re.sub(r'(http|ftp|https)(://)([\w_-]+(?:\.[\w_-]+)*)?([\d\w.,@?^=%&:/~+#-]*)?', '', item.content)
+    content = re.sub(r'(http|ftp|https)(://)([\w_-]+(?:\.[\w_-]+)*)?([\d\w.,@?^=%&:/~+#-]*)?', '', item.content)
     # Ascii
-    item.content = re.sub(r'([^\x20-\x7f]*)*([\t\n\r]*)*', '', item.content)
+    content = re.sub(r'([^\x20-\x7f]*)*([\t\n\r]*)*', '', content)
     # Swearwords
-    item.content = re.sub(r'[.,@?^=*%$\'";{}[\]<>|\\\!&:/~+#-]{4,}', ' fucking ', item.content)
+    content = re.sub(r'[.,@?^=*%$\'";{}[\]<>|\\\!&:/~+#-]{4,}', ' fucking ', content)
     # Spaces
-    item.content = re.sub(r'\x20{2,}', ' ', item.content)
-    return item
+    content = re.sub(r'\x20{2,}', ' ', content)
+    return Item(content, item.topic, item.source)
 
 
 def feature_convert(item, vocab, document_length=30, sentence_length=30):
@@ -79,8 +79,7 @@ def feature_convert(item, vocab, document_length=30, sentence_length=30):
         for j, word in enumerate(sentence):
             if i < document_length and j < sentence_length:
                 features[i][j] = word
-    new_item = Item(features, item.topic, item.source)
-    return new_item
+    return Item(features, item.topic, item.source)
 
 
 class PreProcessWorker(Process):
@@ -95,8 +94,7 @@ class PreProcessWorker(Process):
 
     def run(self):
         incoming = Client(('localhost', self.incoming_port), authkey=b'veryscrape')
-        listener = Listener(('localhost', self.outgoing_port), authkey=b'veryscrape')
-        outgoing = listener.accept()
+        outgoing = Listener(('localhost', self.outgoing_port), authkey=b'veryscrape').accept()
 
         while self.running:
             item = incoming.recv()
@@ -105,7 +103,7 @@ class PreProcessWorker(Process):
                 item = clean_general(item)
                 item = feature_convert(item, self.vocab)
                 outgoing.send(item)
-            except AttributeError:
+            except (AttributeError, ValueError, lxml.etree.XMLSyntaxError):
                 pass
             except Exception as e:
                 print('PreProcess', repr(e))
