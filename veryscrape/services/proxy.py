@@ -142,7 +142,7 @@ class ProxyServer(APIServer):
 
 
 async def proxy_server(address):
-    params = {'apiKey': '3c6527a27448d2873e2e4cd0114c202bfd0ff58f', 'anonymity': 'high anonymity', 'protocol': 'http'}
+    params = []
     base = 'https://api.getproxylist.com/proxy?' + urlencode(params)
     loop = asyncio.get_event_loop()
 

@@ -112,7 +112,6 @@ class Proxy:
 
 async def random_proxy(**params):
     base = 'https://api.getproxylist.com/proxy?'
-    params.update({'apiKey': '3c6527a27448d2873e2e4cd0114c202bfd0ff58f', 'anonymity': 'high anonymity'})
     async for _ in ExponentialBackOff(1):
         async with aiohttp.ClientSession() as session:
             async with session.request('GET', base + urlencode(params)) as response:
