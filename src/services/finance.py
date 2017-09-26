@@ -24,7 +24,7 @@ class FinanceWorker(Process):
     @staticmethod
     def extract_stock(html_text):
         """Scrapes stock price from html_text from google finance"""
-        stock_price = 0.
+        stock_price = -1
         tmp = re.search(r'id="ref_(.*?)">(.*?)<', html_text)
         if tmp:
             stock_price = eval(tmp.group(2).replace(',', ''))
@@ -33,7 +33,7 @@ class FinanceWorker(Process):
     def finance_search(self, query, proxy, user_agent):
         """Query recent stock price for query using provided user agent and proxy"""
         search_url = "http://www.google.com/finance?&q=" + query
-        resp, stock_price = '', 0.0
+        resp, stock_price = '', -1
         ex = False
         count = 0
         while not resp and count < 100:

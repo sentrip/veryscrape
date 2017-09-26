@@ -7,7 +7,7 @@ if __name__ == '__main__':
     from src.services.sentimentprocess import SentimentWorker, SentimentAverage
     from src.services.stream import StreamWorker
     from src.services.write import WriteWorker
-    send_every = 15
+    send_every = 60
     file_lock = Lock()
     sent_queue = Queue()
 

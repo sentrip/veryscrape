@@ -65,7 +65,7 @@ class CommentStream(AsyncStream):
 
     async def get_comments(self, query, **params):
         try:
-            link_url = self.BASE + '{}/rising.json?{}&raw_json=1&limit=30'.format(query, urlencode(params))
+            link_url = self.BASE + '{}/hot.json?{}&raw_json=1&limit=30'.format(query, urlencode(params))
             comment_url = self.BASE + '%s/comments/{}.json?%s&raw_json=1&limit=10000&depth=10' % (query, urlencode(params))
             j = await self.fetch_json(link_url)
             links = {i['data']['id']: i['data']['created_utc'] for i in j['data']['children']}

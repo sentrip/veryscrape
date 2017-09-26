@@ -3,6 +3,7 @@ import datetime
 import os
 import time
 from collections import defaultdict
+from functools import partial
 from multiprocessing import Queue, Process
 from multiprocessing.connection import Client, Listener
 from threading import Thread
@@ -22,7 +23,7 @@ class WriteWorker(Process):
         self.topics = sorted(list(Producer.load_query_dictionary('query_topics.txt').keys()))
         self.file_name = os.path.join(BASE_DIR, 'lib', 'data', 'companyData.csv')
         self.subgroup_types = ['stock', 'reddit', 'twitter', 'article', 'blog']
-        self.current_data = {c: {sg: 0. for sg in self.subgroup_types} for c in self.topics}
+        self.current_data = {c: {sg: -1 for sg in self.subgroup_types} for c in self.topics}
         self.gym_queue = Queue()
         self.running = True
         self.clock = time.time()
@@ -47,23 +48,25 @@ class WriteWorker(Process):
                 with self.file_lock:
                     with open(self.file_name, 'a') as f:
                         f.write('{},{}\n'.format(time_string, data_string))
-                self.current_data = {c: {sg: 0. for sg in self.subgroup_types} for c in self.topics}
+                self.current_data = {c: {sg: -1 for sg in self.subgroup_types} for c in self.topics}
                 print('Wrote to disk at {}'.format(time_string))
                 self.clock += self.send_every
 
     def send_to_gym(self, gym_queue):
         """Consumes items from gym queue and sends complete dictionary of a single time snapshot to gym environment"""
-        l = Listener(('localhost', self.gym_port), authkey=b'veryscrape')
-        outgoing = l.accept()
+        outgoing = Listener(('localhost', self.gym_port), authkey=b'veryscrape').accept()
         while self.running:
-            send_dictionary = defaultdict(lambda: defaultdict(dict))
+            send_dictionary = defaultdict(partial(defaultdict, dict))
             while sum(len(i) for c, i in send_dictionary.items()) < len(self.topics) * len(self.subgroup_types):
                 item = gym_queue.get()
                 send_dictionary[item.topic][item.source] = item.content
-            outgoing.send(send_dictionary)
+            try:
+                outgoing.send(send_dictionary)
+            except EOFError:
+                outgoing.close()
+                outgoing = Listener(('localhost', self.gym_port), authkey=b'veryscrape').accept()
 
     def run(self):
-        gym_queue = Queue()
         stock = Client(('localhost', self.stock_port), authkey=b'veryscrape')
         sentiment = Client(('localhost', self.sentiment_port), authkey=b'veryscrape')
 
@@ -74,7 +77,7 @@ class WriteWorker(Process):
 
         Thread(target=self.save_incoming, args=(sentiment, True, )).start()
         Thread(target=self.save_incoming, args=(stock, False,)).start()
-        Thread(target=self.send_to_gym, args=(gym_queue,)).start()
+        Thread(target=self.send_to_gym, args=(self.gym_queue,)).start()
 
         while self.running:
             st = time.time()

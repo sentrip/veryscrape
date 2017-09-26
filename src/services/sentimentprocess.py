@@ -65,7 +65,7 @@ class SentimentAverage(Thread):
         self.types = ['reddit', 'twitter', 'article', 'blog']
         self.topics = sorted(list(Producer.load_query_dictionary('query_topics.txt')))
         self.current_sentiments = {t: {q: [] for q in self.types} for t in self.topics}
-        self.last_sentiments = {t: {q: 0.0 for q in self.types} for t in self.topics}
+        self.last_sentiments = {t: {q: -1 for q in self.types} for t in self.topics}
 
         self.count = 0
         self.items_per_second = 0
