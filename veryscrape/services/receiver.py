@@ -17,9 +17,10 @@ class MainServer(web.Server):
 
     async def process_request(self, request):
         try:
-            r_json = await request.json()
-            result = Item(**eval(r_json))
-            self.queue.put(result)
+            if request.method != 'POST':
+                raise TypeError
+            data = await request.post()
+            self.queue.put(Item(**data))
             return web.Response(text='Success!', status=200)
 
         except TypeError:
@@ -32,13 +33,12 @@ async def main_server(address):
     session = aiohttp.ClientSession()
     server = MainServer()
     await loop.create_server(server, *address)
-    c = 0
+    c = 1
     while True:
         try:
             if not server.queue.empty():
                 _ = server.queue.get()
-                if c % 100 == 0:
-                    print(c)
+                print(c, _)
                 c += 1
             else:
                 await asyncio.sleep(0.1)
@@ -49,41 +49,7 @@ async def main_server(address):
     await server.shutdown()
     loop.close()
 
-
-
-import json, time, multiprocessing
-
-
-async def fetch(s, js):
-    async with s.get('http://127.0.0.1:9999', json=js) as response:
-        await response.text()
-
-async def lp():
-    js = json.dumps({'topic': 'AAPL', 'source': 'twitter', 'content': 'hello'})
-    s = aiohttp.ClientSession()
-    while True:
-        try:
-            asyncio.ensure_future(fetch(s, js))
-            await asyncio.sleep(0)
-        except KeyboardInterrupt:
-            break
-    s.close()
-
-
-def run():
-    policy = asyncio.get_event_loop_policy()
-    policy.set_event_loop(policy.new_event_loop())
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(lp())
-
-
-def hammer(n_processes=4):
-    time.sleep(5)
-    for _ in range(n_processes):
-        multiprocessing.Process(target=run).start()
-
 if __name__ == '__main__':
-    add = '127.0.0.1', 9999
-    #hammer(4)
+    add = '192.168.1.53', 9999
     main_loop = asyncio.get_event_loop()
     main_loop.run_until_complete(main_server(add))
