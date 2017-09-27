@@ -1,7 +1,6 @@
 import asyncio
 import time
 from collections import defaultdict
-from functools import partial
 from urllib.parse import urlencode
 
 from veryscrape import SearchClient
@@ -10,8 +9,9 @@ from veryscrape import SearchClient
 class Reddit(SearchClient):
     base_url = 'https://oauth.reddit.com/r/'
     token_url = 'https://www.reddit.com/api/v1/access_token'
-    rate_limit = 60
     token_expiry = time.time()
+    rate_limit = 60
+
     # Reddit api paths
     link_url = '{}/hot.json?raw_json=1&limit=100{}'
     comment_url = '{}/comments/{}.json?raw_json=1&limit=10000&depth=10{}'

@@ -1,6 +1,7 @@
 import asyncio
 import unittest
 from functools import wraps
+
 from veryscrape import Producer
 from veryscrape.extensions.reddit import Reddit
 
@@ -14,8 +15,6 @@ def run_async(f):
 
 
 class RedditTest(unittest.TestCase):
-    last_link = None
-    last_comment = None
 
     def setUp(self):
         self.topics = Producer.load_query_dictionary('subreddits.txt')
@@ -27,23 +26,26 @@ class RedditTest(unittest.TestCase):
         @run_async
         async def run():
             reddit = Reddit(self.auth[self.topic])
-            links = await reddit.get_links(self.q)
-            self.last_link = links.popitem()[0]
-            assert len(links) > 0 and len(self.last_link) == 6, 'Did not retrieve any links'
+            url = reddit.link_url.format(self.q, '')
+            resp = await reddit.request('GET', url, oauth=2, return_json=True)
+            assert resp, 'Empty json'
+            assert resp['data'], 'Invalid response'
             await reddit.close()
         run()
 
-    def test_get_zcomments(self):
+    def test_get_comments(self):
         @run_async
         async def run():
             reddit = Reddit(self.auth[self.topic])
-            if self.last_link is None:
-                links = await reddit.get_links(self.q)
-                self.last_link = links.popitem()[0]
-            comments = await reddit.get_comments(self.q, self.last_link)
-            self.last_comment = comments.pop()['data']['body_html']
-            assert len(comments) > 0, 'Did not retrieve any comments'
-            assert self.last_comment.startswith('<'), 'Incorrect comment response format'
+            url = reddit.link_url.format(self.q, '')
+            resp = await reddit.request('GET', url, oauth=2, return_json=True)
+            assert resp, 'Empty json'
+            assert resp['data'], 'Invalid response'
+            url = reddit.comment_url.format(self.q, resp['data']['children'][-1]['data']['id'], '')
+            resp = await reddit.request('GET', url, oauth=2, return_json=True)
+            assert resp, 'Empty json'
+            assert resp[0]['data'], 'Invalid response'
+            assert isinstance(resp[1]['data']['children'], list), 'Comments incorrectly returned'
             await reddit.close()
         run()
 
@@ -51,12 +53,16 @@ class RedditTest(unittest.TestCase):
         @run_async
         async def run():
             reddit = Reddit(self.auth[self.topic])
-            if self.last_comment is None:
-                links = await reddit.get_links(self.q)
-                self.last_link = links.popitem()[0]
-                comments = await reddit.get_comments(self.q, self.last_link)
-                self.last_comment = comments.pop()
-            await reddit.send_comments([self.last_comment], self.topic)
+            url = reddit.link_url.format(self.q, '')
+            resp = await reddit.request('GET', url, oauth=2, return_json=True)
+            assert resp, 'Empty json'
+            assert resp['data'], 'Invalid response'
+            url = reddit.comment_url.format(self.q, resp['data']['children'][-1]['data']['id'], '')
+            resp = await reddit.request('GET', url, oauth=2, return_json=True)
+            assert resp, 'Empty json'
+            assert resp[0]['data'], 'Invalid response'
+            assert isinstance(resp[1]['data']['children'], list), 'Comments incorrectly returned'
+            await reddit.send_comments(resp[1]['data']['children'], self.topic)
             await reddit.close()
         run()
 
