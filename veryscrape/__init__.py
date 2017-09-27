@@ -39,7 +39,7 @@ class ExponentialBackOff:
         return self.count
 
     async def safely_execute(self, f, *args, **kwargs):
-        retries = kwargs.get('retries', 2)
+        retries = kwargs.get('retries', 5)
         executed = False
         ex, excep = '', None
         while not executed:
@@ -135,8 +135,13 @@ class SearchClient:
             'oauth_timestamp': str(int(time.time()))
         }
 
-    async def _request(self, method, url, params, oauth, **aio_kwargs):
+    async def _request(self, method, url, params, oauth, use_proxy, **aio_kwargs):
         params = params or {}
+
+        if (self.proxy is None or self.failed) and use_proxy is not None:
+            kwargs = {} if use_proxy is None else {'json':  json.dumps(use_proxy)}
+            self.proxy = await self.request('GET', 'http://192.168.0.100:9999', **kwargs)
+            aio_kwargs.update({'proxy': self.proxy})
 
         if oauth == 1:
             params.update(self.oauth1_parameters)
@@ -152,31 +157,21 @@ class SearchClient:
     async def request(self, method, url, params=None, oauth=False, stream=False,
                       use_proxy=None, return_json=False, **aio_kwargs):
         url = urljoin(self.base_url, url) if not any(url.startswith(pre) for pre in ['http://', 'https://']) else url
-        # set up proxy arguments
-        if (self.proxy is None or self.failed) and use_proxy is not None:
-            kwargs = {} if use_proxy is None else {'json':  json.dumps(use_proxy)}
-            self.proxy = await self.request('GET', 'http://192.168.0.100:9999', **kwargs)
-            aio_kwargs.update({'proxy': self.proxy})
-        # wait for rate limit if exists
-        while self.rate_limit and self.request_count > self.rate_limit:
-            self.update_rate_limit()
-            await asyncio.sleep(0.1)
 
-        resp = await self.retries.safely_execute(self._request, method, url, params, oauth, **aio_kwargs)
+        while self.rate_limit and self.request_count > self.rate_limit:
+            await self.update_rate_limit()
+
+        resp = await self.retries.safely_execute(self._request, method, url, params, oauth, use_proxy, **aio_kwargs)
 
         if resp is None or resp.status != 200:
-            raise ConnectionError('Could not {} (to) {}'.format(method, url))
+            raise ConnectionError('Could not {} {}, error code: {}'.format(method, url,
+                                                                           'None' if resp is None else resp.status))
+        if stream:
+            return resp
+        elif return_json:
+            return await resp.json()
         else:
-            if not stream:
-                if return_json:
-                    return await resp.json()
-                else:
-                    return await resp.text()
-            else:
-                result = resp.content
-                result.status = resp.status
-                result.headers = resp.headers
-                return result
+            return await resp.text()
 
     async def update_oauth2_token(self):
         resp = await self.request('POST', self.token_url, return_json=True,
@@ -188,7 +183,7 @@ class SearchClient:
         except KeyError:
             self.token_expiry = 0
 
-    def update_rate_limit(self):
+    async def update_rate_limit(self):
         now = time.time()
         seconds_since = now - self.rate_limit_clock
         if seconds_since >= 1:
@@ -196,6 +191,7 @@ class SearchClient:
             self.request_count -= difference
             self.request_count = max(0, self.request_count)
             self.rate_limit_clock = now if difference else self.rate_limit_clock
+        await asyncio.sleep(0.1)
 
     async def send_item(self, content, topic, source):
         return await self.request('GET', 'http://192.168.1.53:9999',
