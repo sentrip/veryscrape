@@ -14,7 +14,7 @@ from fake_useragent import UserAgent
 
 random = SystemRandom().random
 
-BASE_DIR = "/home/djordje/Sentrip/" if os.path.isdir("/home/djordje/Sentrip/") else "C:/users/djordje/desktop"
+BASE_DIR = "/home/djordje/Sentrip/" if os.path.isdir("/home/djordje/Sentrip/") else "C:/users/djordje/desktop/"
 Item = namedtuple('Item', ['content', 'topic', 'source'])
 Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
 
