@@ -71,7 +71,7 @@ class TestTwitter(unittest.TestCase):
         @run_async
         async def read():
             twitter = Twitter(self.auth['AAPL'])
-            await twitter.filter_stream('apple', 'AAPL', duration=1, use_proxy=False)
+            await twitter.filter_stream('apple', 'AAPL', duration=1, use_proxy=True)
             await twitter.close()
         read()
 

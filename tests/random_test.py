@@ -48,6 +48,3 @@ if __name__ == '__main__':
             print(i)
     if 'w' not in stages:
         Thread(target=print_stuff).start()
-
-"""Reddit ClientConnectorError(110, "Cannot connect to host oauth.reddit.com:443 ssl:True [Can not connect to oauth.reddit.com:443 [Connect call failed ('151.101.61.140', 443)]]"
-"""
