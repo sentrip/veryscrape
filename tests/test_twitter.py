@@ -48,13 +48,13 @@ class TestTwitter(unittest.TestCase):
                 assert item == 'This item', 'Did not return same item!'
         read()
 
-    def test_twitter_aquire_stream(self):
+    def test_twitter_acquire_stream(self):
         params = {'language': 'en', 'track': 'apple'}
 
         @run_async
         async def read():
             twitter = Twitter(self.auth['FB'])
-            raw = await twitter.request('POST', 'statuses/filter.json', params=params, oauth=True, stream=True)
+            raw = await twitter.request('POST', 'statuses/filter.json', params=params, oauth=1, stream=True)
             await twitter.close()
             assert raw.status == 200, 'Request failed, returned error code {}'.format(raw.status)
         read()

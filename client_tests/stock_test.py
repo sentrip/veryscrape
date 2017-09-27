@@ -1,11 +1,11 @@
-from multiprocessing.connection import Listener
-from src.base import Producer
 import random
 import time
+from multiprocessing.connection import Listener
+from threading import Thread
+
 import gym
 
-from multiprocessing import Process
-from threading import Thread
+from src.base import Producer
 
 
 def distribute(n):

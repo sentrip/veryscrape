@@ -17,7 +17,7 @@ class Twitter(SearchClient):
 
     async def filter_stream(self, track=None, topic=None, duration=3600, use_proxy=False):
         start_time = time.time()
-        raw = await self.request('POST', 'statuses/filter.json', oauth=True, stream=True,
+        raw = await self.request('POST', 'statuses/filter.json', oauth=1, stream=True,
                                  params={'langauge': 'en', 'track': track},
                                  use_proxy={'speed': 100, 'https': 1, 'post': 1} if use_proxy else None)
         if raw.status == 420:

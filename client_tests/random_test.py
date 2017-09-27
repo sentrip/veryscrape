@@ -1,6 +1,6 @@
 import time
-from threading import Thread, Lock
 from multiprocessing import Queue
+from threading import Thread, Lock
 
 # stages: f - Finance, t - Stream, p - PreProcess, s - Sentiment, w - Write
 stages = 'tps'

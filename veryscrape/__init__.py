@@ -41,7 +41,7 @@ class ExponentialBackOff:
     async def safely_execute(self, f, *args, **kwargs):
         retries = kwargs.get('retries', 5)
         executed = False
-        e = None
+        ex = ''
         while not executed:
             if await self.__anext__() < retries:
                 try:
@@ -49,10 +49,11 @@ class ExponentialBackOff:
                     self.reset()
                     return result
                 except Exception as e:
+                    ex += repr(e) + '\n'
                     print(repr(e))
             else:
                 break
-        raise ValueError('Safe execution of {} failed, last known cause: {}'.format(f.__name__, repr(e)))
+        raise ValueError('Safe execution of {} failed, last known cause: {}'.format(f.__name__, repr(ex)))
 
 
 class ReadBuffer:
@@ -104,17 +105,23 @@ class SearchClient:
 
     # OAuth
     client, secret, token, token_secret = None, None, None, None
+    token_url = None
+    token_expiry = 0
     signature = aioauth_client.HmacSha1Signature()
     # Proxies and retries
     proxy = None
     failed = False
     retries = ExponentialBackOff()
+    # Rate limits
+    rate_limit = 0  # Requests per minute
+    request_count = 0
+    rate_limit_clock = time.time()
 
     def __init__(self):
         self.session = aiohttp.ClientSession(headers={'user-agent': UserAgent().random})
 
     @property
-    def oauth_parameters(self):
+    def oauth1_parameters(self):
         return {
             'oauth_consumer_key': self.client,
             'oauth_token': self.token,
@@ -126,30 +133,62 @@ class SearchClient:
 
     async def _request(self, method, url, params, oauth, **aio_kwargs):
         params = params or {}
-        if oauth:
-            params.update(self.oauth_parameters)
+        if oauth == 1:
+            params.update(self.oauth1_parameters)
             params['oauth_signature'] = self.signature.sign(self.secret, method, url, self.token_secret, **params)
+        elif oauth == 2:
+            if time.time() >= self.token_expiry and self.token_expiry:
+                await self.update_oauth2_token()
+            aio_kwargs.update({'headers': {'Authorization': 'Bearer ' + self.token}})
         return await self.session.request(method, url, params=params, **aio_kwargs)
 
-    async def request(self, method, url, params=None, oauth=False, stream=False, use_proxy=None, **aio_kwargs):
+    async def request(self, method, url, params=None, oauth=False, stream=False,
+                      use_proxy=None, return_json=False, **aio_kwargs):
         url = urljoin(self.base_url, url) if not any(url.startswith(pre) for pre in ['http://', 'https://']) else url
 
         if (self.proxy is None or self.failed) and use_proxy is not None:
             kwargs = {'json': json.dumps(use_proxy)} if use_proxy else {}
             self.proxy = await self.request('GET', 'http://192.168.0.100:9999', **kwargs)
             aio_kwargs.update({'proxy': self.proxy})
+
+        if self.rate_limit and self.request_count < self.rate_limit:
+            while True:
+                self.update_rate_limit()
+                await asyncio.sleep(0.1)
         resp = await self.retries.safely_execute(self._request, method, url, params, oauth, **aio_kwargs)
 
         if resp is None or resp.status != 200:
             raise ConnectionError('Could not {} (to) {}'.format(method, url))
         else:
             if not stream:
-                return await resp.text()
+                if return_json:
+                    return await resp.json()
+                else:
+                    return await resp.text()
             else:
                 result = resp.content
                 result.status = resp.status
                 result.headers = resp.headers
                 return result
+
+    async def update_oauth2_token(self):
+        aio_kwargs = {'data': {'grant_type': 'client_credentials'},
+                      'auth': aiohttp.BasicAuth(self.client, self.secret)}
+        resp = await self.request('POST', self.token_url, return_json=True, **aio_kwargs)
+        self.token = resp['access_token']
+        try:
+            self.token_expiry = int(time.time()) + int(resp['expires_in'])
+        except KeyError:
+            self.token_expiry = 0
+
+    def update_rate_limit(self):
+        now = time.time()
+        seconds_since = now - self.rate_limit_clock
+        if seconds_since >= 1:
+            difference = int(seconds_since / 60 * self.rate_limit)
+            self.request_count -= difference
+            self.request_count = max(0, self.request_count)
+            self.rate_limit_clock = now if difference else self.rate_limit_clock
 
     async def send_item(self, content, topic, source):
         return await self.request('GET', 'http://192.168.1.53:9999',
