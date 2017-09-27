@@ -39,11 +39,11 @@ class ExponentialBackOff:
         return self.count
 
     async def safely_execute(self, f, *args, **kwargs):
-        retries = kwargs.get('retries', 5)
+        retries = kwargs.get('retries', 2)
         executed = False
-        ex = ''
+        ex, excep = '', None
         while not executed:
-            if await self.__anext__() < retries:
+            if await self.__anext__() <= retries:
                 try:
                     result = await f(*args, **kwargs)
                     self.reset()
@@ -51,9 +51,13 @@ class ExponentialBackOff:
                 except Exception as e:
                     ex += repr(e) + '\n'
                     print(repr(e))
+                    excep = e
             else:
                 break
-        raise ValueError('Safe execution of {} failed, last known cause: {}'.format(f.__name__, repr(ex)))
+        if not excep:
+            raise ValueError('Safe execution of {} failed, last known cause: {}'.format(f.__name__, ex))
+        else:
+            raise excep
 
 
 class ReadBuffer:
@@ -133,28 +137,31 @@ class SearchClient:
 
     async def _request(self, method, url, params, oauth, **aio_kwargs):
         params = params or {}
+
         if oauth == 1:
             params.update(self.oauth1_parameters)
             params['oauth_signature'] = self.signature.sign(self.secret, method, url, self.token_secret, **params)
+
         elif oauth == 2:
-            if time.time() >= self.token_expiry and self.token_expiry:
+            if (time.time() >= self.token_expiry and self.token_expiry) or self.token is None:
                 await self.update_oauth2_token()
-            aio_kwargs.update({'headers': {'Authorization': 'Bearer ' + self.token}})
+            aio_kwargs.update({'headers': {'Authorization': 'bearer ' + self.token}})
+
         return await self.session.request(method, url, params=params, **aio_kwargs)
 
     async def request(self, method, url, params=None, oauth=False, stream=False,
                       use_proxy=None, return_json=False, **aio_kwargs):
         url = urljoin(self.base_url, url) if not any(url.startswith(pre) for pre in ['http://', 'https://']) else url
-
+        # set up proxy arguments
         if (self.proxy is None or self.failed) and use_proxy is not None:
-            kwargs = {'json': json.dumps(use_proxy)} if use_proxy else {}
+            kwargs = {} if use_proxy is None else {'json':  json.dumps(use_proxy)}
             self.proxy = await self.request('GET', 'http://192.168.0.100:9999', **kwargs)
             aio_kwargs.update({'proxy': self.proxy})
+        # wait for rate limit if exists
+        while self.rate_limit and self.request_count > self.rate_limit:
+            self.update_rate_limit()
+            await asyncio.sleep(0.1)
 
-        if self.rate_limit and self.request_count < self.rate_limit:
-            while True:
-                self.update_rate_limit()
-                await asyncio.sleep(0.1)
         resp = await self.retries.safely_execute(self._request, method, url, params, oauth, **aio_kwargs)
 
         if resp is None or resp.status != 200:
@@ -172,9 +179,9 @@ class SearchClient:
                 return result
 
     async def update_oauth2_token(self):
-        aio_kwargs = {'data': {'grant_type': 'client_credentials'},
-                      'auth': aiohttp.BasicAuth(self.client, self.secret)}
-        resp = await self.request('POST', self.token_url, return_json=True, **aio_kwargs)
+        resp = await self.request('POST', self.token_url, return_json=True,
+                                  data={'grant_type': 'client_credentials'},
+                                  auth=aiohttp.BasicAuth(self.client, self.secret))
         self.token = resp['access_token']
         try:
             self.token_expiry = int(time.time()) + int(resp['expires_in'])
