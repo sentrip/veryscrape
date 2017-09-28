@@ -194,8 +194,8 @@ class SearchClient:
         await asyncio.sleep(0.1)
 
     async def send_item(self, content, topic, source):
-        return await self.request('GET', 'http://192.168.1.53:9999',
-                                  json=json.dumps({'content': content, 'topic': topic, 'source': source}))
+        return await self.request('POST', 'http://192.168.1.53:9999',
+                                  data={'content': content, 'topic': topic, 'source': source})
 
     async def close(self):
         try:
