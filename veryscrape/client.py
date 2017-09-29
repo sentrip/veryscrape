@@ -43,12 +43,12 @@ class SearchClient:
             self.request_count = max(0, self.request_count - difference)
             self.rate_limit_clock = now if difference else self.rate_limit_clock
 
-    def build_arguments(self, method, url, oauth, use_proxy, params, aio_kwargs):
+    async def build_arguments(self, method, url, oauth, use_proxy, params, aio_kwargs):
         if not url.startswith('http'):
             url = urljoin(self.base_url, url)
 
         if use_proxy is not None:
-            self.update_proxy(use_proxy)
+            await self.update_proxy(use_proxy)
             aio_kwargs.update({'proxy': self.proxy})
 
         if oauth == 1:
@@ -101,7 +101,7 @@ class SearchClient:
         if self.oauth2_token_expired:
             await self.update_oauth2_token()
 
-        url, params, aio_kwargs = self.build_arguments(method, url, oauth, use_proxy, params, aio_kwargs)
+        url, params, aio_kwargs = await self.build_arguments(method, url, oauth, use_proxy, params, aio_kwargs)
         resp = await self.session.request(method, url, params=params or {}, **aio_kwargs)
         return resp if stream else (await resp.json() if return_json else await resp.text())
 

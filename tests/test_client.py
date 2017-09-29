@@ -66,8 +66,9 @@ class TestSearchClient(unittest.TestCase):
     def test_instantiate_client(self):
         pass
 
-    def test_build_arguments(self):
-        url, params, aio_kwargs = self.client.build_arguments('GET', '/test', False, None, {}, {})
+    @synchronous
+    async def test_build_arguments(self):
+        url, params, aio_kwargs = await self.client.build_arguments('GET', '/test', False, None, {}, {})
         assert url.startswith('http'), 'Invalid url returned'
         assert isinstance(params, dict), 'Invalid parameters returned'
         assert isinstance(aio_kwargs, dict), 'Invalid aio-http kwargs returned'
