@@ -88,5 +88,11 @@ class TestSearchClient(unittest.TestCase):
         self.client.update_rate_limit()
         assert self.client.request_count == 60, 'Request count was decremented when it shouldn\'t have been'
 
+    def test_extract_urls(self):
+        urls = ['http://google.com/', 'http://myblogspot.blog.com/thing/article/1034.php']
+        self.client.clean_urls(urls)
+        print(urls)
+        assert len(urls) == 1, 'Urls were not successfully cleaned'
+
 if __name__ == '__main__':
     unittest.main()

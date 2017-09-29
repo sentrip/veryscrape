@@ -1,4 +1,5 @@
 import time
+from collections import namedtuple
 from hashlib import sha1
 from random import SystemRandom
 from urllib.parse import urljoin
@@ -10,6 +11,7 @@ from fake_useragent import UserAgent
 from veryscrape import retry
 
 random = SystemRandom().random
+mock_response = namedtuple('Response', ['status', 'text'])
 
 
 class SearchClient:
@@ -28,9 +30,10 @@ class SearchClient:
     rate_limit_clock = time.time()
     proxy = None
     failed = False
+    user_agent = UserAgent().random
 
     def __init__(self):
-        self.session = aiohttp.ClientSession(headers={'user-agent': UserAgent().random})
+        self.session = aiohttp.ClientSession(headers={'user-agent': self.user_agent})
 
     def update_rate_limit(self):
         now = time.time()
@@ -105,11 +108,14 @@ class SearchClient:
     async def get(self, url, **kwargs):
         return await self.request('GET', url, **kwargs)
 
-    async def post(self, url, data=None, close_response=True, **kwargs):
+    async def post(self, url, data=None, stream=False, **kwargs):
         resp = await self.request('POST', url, data=data, **kwargs, stream=True)
-        if close_response:
-            await resp.text()
-        return resp
+        if stream:
+            return resp
+        else:
+            result = await resp.text()
+            mock_resp = mock_response(resp.status, result)
+            return mock_resp
 
     async def close(self):
         await self.session.close()
@@ -129,10 +135,9 @@ class SearchClient:
     def clean_urls(urls):
         bad_domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
         false_urls = {'google.', 'blogger.', 'youtube.', 'googlenewsblog.'}
-        new_urls = set()
-        for url in urls:
+        for url in list(urls):
             is_root_url = any(url.endswith(j) for j in bad_domains)
             is_not_relevant = any(j in url for j in false_urls)
-            if url.startswith('http') and not (is_root_url or is_not_relevant):
-                new_urls.add(url)
-        return new_urls
+            if is_root_url or is_not_relevant or not url.startswith('http'):
+                urls.remove(url)
+        return urls

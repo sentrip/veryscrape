@@ -11,6 +11,7 @@ class Reddit(SearchClient):
     token_url = 'https://www.reddit.com/api/v1/access_token'
     token_expiry = time.time()
     rate_limit = 60
+    user_agent = 'test app'
 
     # Reddit api paths
     link_url = '{}/hot.json?raw_json=1&limit=100{}'

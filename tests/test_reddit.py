@@ -1,33 +1,23 @@
-import asyncio
 import unittest
-from functools import wraps
 
 from veryscrape import Producer, synchronous, get_auth
 from veryscrape.extensions.reddit import Reddit
 
 
-def run_async(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        l = asyncio.get_event_loop()
-        return l.run_until_complete(f(*args, **kwargs))
-    return wrapper
+@synchronous
+async def f():
+    return await get_auth('reddit')
 
 
 class RedditTest(unittest.TestCase):
-
-    def setUp(self):
-        @synchronous
-        async def f():
-            return await get_auth('reddit')
-        auth = f()
-        self.topics = Producer.load_query_dictionary('subreddits')
-        self.auth = {k: a for k, a in zip(sorted(self.topics.keys()), auth)}
-        self.topic = next(iter(list(self.topics.keys())))
-        self.q = self.topics[self.topic][0]
+    auths = f()
+    topics = Producer.load_query_dictionary('subreddits')
+    auth = {k: a for k, a in zip(sorted(topics.keys()), auths)}
+    topic = next(iter(list(topics.keys())))
+    q = 'all'
 
     def test_get_links(self):
-        @run_async
+        @synchronous
         async def run():
             reddit = Reddit(self.auth[self.topic])
             url = reddit.link_url.format(self.q, '')
@@ -38,7 +28,7 @@ class RedditTest(unittest.TestCase):
         run()
 
     def test_get_comments(self):
-        @run_async
+        @synchronous
         async def run():
             reddit = Reddit(self.auth[self.topic])
             url = reddit.link_url.format(self.q, '')
@@ -54,7 +44,7 @@ class RedditTest(unittest.TestCase):
         run()
 
     def test_send_comments(self):
-        @run_async
+        @synchronous
         async def run():
             reddit = Reddit(self.auth[self.topic])
             url = reddit.link_url.format(self.q, '')

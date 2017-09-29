@@ -9,6 +9,7 @@ from veryscrape.client import SearchClient
 
 class Twingly(SearchClient):
     base_url = "https://api.twingly.com/"
+    blog_search_path = 'blog/search/api/v3/search'
 
     def __init__(self, auth, queue):
         super(Twingly, self).__init__()
@@ -20,6 +21,7 @@ class Twingly(SearchClient):
         try:
             result = self.parser.parse(resp)
         except TwinglySearchAuthenticationException:
+            print('Twingly not authenticated!')
             time.sleep(1200)
             raise TwinglySearchAuthenticationException(401)
         urls = [post.url for post in result.posts]
@@ -33,7 +35,7 @@ class Twingly(SearchClient):
         start_time = time.time()
         while True:
             params = {'apiKey': self.client, 'q': self.build_query(track)}
-            resp = await self.get('blog/search/api/v3/search', params=params)
+            resp = await self.get(self.blog_search_path, params=params)
 
             urls = self.extract_urls(resp)
             for url in urls:
