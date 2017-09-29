@@ -4,7 +4,7 @@ import requests
 
 
 class TestAPI(unittest.TestCase):
-    server = 'http://129.168.0.100:1111'
+    server = 'http://192.168.0.100:1111'
 
     def test_api_request_no_params(self):
         r = requests.get(self.server)

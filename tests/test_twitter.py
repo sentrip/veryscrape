@@ -62,13 +62,13 @@ class TestTwitter(unittest.TestCase):
             await twitter.close()
         read()
 
-    def test_twitter_filter_stream_proxy(self):
-        @synchronous
-        async def read():
-            twitter = Twitter(self.auth['AAPL'])
-            await twitter.filter_stream('apple', 'AAPL', duration=1, use_proxy=True)
-            await twitter.close()
-        read()
+    # def test_twitter_filter_stream_proxy(self):
+    #     @synchronous
+    #     async def read():
+    #         twitter = Twitter(self.auth['AAPL'])
+    #         await twitter.filter_stream('apple', 'AAPL', duration=1, use_proxy=True)
+    #         await twitter.close()
+    #     read()
 
 if __name__ == '__main__':
     unittest.main()

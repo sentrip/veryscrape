@@ -72,7 +72,7 @@ class SearchClient:
 
     @property
     def oauth2_token_expired(self):
-        return (time.time() >= self.token_expiry and self.token_expiry) or self.token is None
+        return (time.time() >= self.token_expiry or self.token is None) and self.token_expiry
 
     @property
     def rate_limit_exceeded(self):
@@ -105,16 +105,21 @@ class SearchClient:
     async def get(self, url, **kwargs):
         return await self.request('GET', url, **kwargs)
 
-    async def post(self, url, data=None, **kwargs):
-        return await self.request('POST', url, data=data, **kwargs)
+    async def post(self, url, data=None, close_response=True, **kwargs):
+        resp = await self.request('POST', url, data=data, **kwargs, stream=True)
+        if close_response:
+            await resp.text()
+        return resp
 
     async def close(self):
         await self.session.close()
 
     @retry(2, wait_factor=1)
-    async def update_proxy(self, proxy_params):
+    async def update_proxy(self, proxy_params=None):
+        proxy_params = proxy_params or {}
         if self.proxy is None or self.failed:
-            self.proxy = await self.session.get(self.proxy_url, params=proxy_params)
+            resp = await self.session.get(self.proxy_url, params=proxy_params)
+            self.proxy = await resp.text()
 
     @retry(2, wait_factor=1)
     async def send_item(self, content, topic, source):

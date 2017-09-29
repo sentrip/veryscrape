@@ -1,11 +1,12 @@
 import time
 import unittest
 
-from veryscrape import synchronous
+from veryscrape import synchronous, get_auth
 from veryscrape.client import SearchClient
 
 
 class TestSearchClient(unittest.TestCase):
+    test_server = 'http://posttestserver.com/'
 
     @synchronous
     async def setUp(self):
@@ -17,27 +18,50 @@ class TestSearchClient(unittest.TestCase):
 
     @synchronous
     async def test_update_proxy(self):
-        pass
+        assert self.client.proxy is None, "Instantiation failed"
+        await self.client.update_proxy()
+        assert self.client.proxy.startswith('http'), 'Incorrect proxy returned'
 
     @synchronous
     async def test_send_item(self):
-        pass
+        resp = await self.client.send_item('TEST', 'test', 'test')
+        assert resp.status == 200, 'Item was not successfully sent'
 
     @synchronous
     async def test_update_oauth2_token(self):
-        pass
+        auth = await get_auth('reddit')
+        self.client.client, self.client.secret = auth[0]
+        self.client.token_url = 'https://www.reddit.com/api/v1/access_token'
+        await self.client.update_oauth2_token()
+        assert self.client.token is not None, 'Token fetching was unsuccessful'
+
+    @synchronous
+    async def test_request_with_oauth2_token(self):
+        auth = await get_auth('reddit')
+        self.client.client, self.client.secret = auth[0]
+        self.client.base_url = 'https://oauth.reddit.com/r/'
+        self.client.token_url = 'https://www.reddit.com/api/v1/access_token'
+        self.client.token_expiry = time.time() - 5
+        resp = await self.client.get('all/hot.json?raw_json=1', oauth=2, stream=True)
+        await resp.text()
+        assert self.client.token is not None, 'Token fetching was unsuccessful'
+        assert resp.status == 200, 'Request was not successfully executed'
 
     @synchronous
     async def test_request(self):
-        pass
+        resp = await self.client.request('GET', self.test_server, stream=True)
+        assert resp.status == 200, 'Request to test server was unsuccessful'
 
     @synchronous
     async def test_get(self):
-        pass
+        resp = await self.client.get(self.test_server, stream=True)
+        assert resp.status == 200, 'Request to test server was unsuccessful'
+        resp.close()
 
     @synchronous
     async def test_post(self):
-        pass
+        resp = await self.client.post(self.test_server + 'post.php', data={'a': 1})
+        assert resp.status == 200, 'Request to test server was unsuccessful'
 
     def test_instantiate_client(self):
         pass

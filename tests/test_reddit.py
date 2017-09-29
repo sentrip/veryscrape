@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from functools import wraps
 
-from veryscrape import Producer
+from veryscrape import Producer, synchronous, get_auth
 from veryscrape.extensions.reddit import Reddit
 
 
@@ -17,8 +17,12 @@ def run_async(f):
 class RedditTest(unittest.TestCase):
 
     def setUp(self):
-        self.topics = Producer.load_query_dictionary('subreddits.txt')
-        self.auth = Producer.load_authentications('reddit.txt')
+        @synchronous
+        async def f():
+            return await get_auth('reddit')
+        auth = f()
+        self.topics = Producer.load_query_dictionary('subreddits')
+        self.auth = {k: a for k, a in zip(sorted(self.topics.keys()), auth)}
         self.topic = next(iter(list(self.topics.keys())))
         self.q = self.topics[self.topic][0]
 

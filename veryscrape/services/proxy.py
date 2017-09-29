@@ -71,7 +71,7 @@ class ProxyServer(web.Server):
             if not good:
                 for k in params:
                     if k == 'speed':
-                        good = good or proxy.speed >= params[k]
+                        good = good or proxy.speed >= float(params[k])
                     else:
                         good = good or proxy not in self.used_proxies
             if good:
@@ -110,7 +110,7 @@ async def proxy_server(address):
     server = ProxyServer()
     await loop.create_server(server, *address)
 
-    proxies_required = 500
+    proxies_required = 1000
     concurrent_requests = 20
 
     while True:
