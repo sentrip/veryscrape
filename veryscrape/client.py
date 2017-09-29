@@ -124,3 +124,15 @@ class SearchClient:
     @retry(2, wait_factor=1)
     async def send_item(self, content, topic, source):
         return await self.session.post(self.item_url, data={'content': content, 'topic': topic, 'source': source})
+
+    @staticmethod
+    def clean_urls(urls):
+        bad_domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
+        false_urls = {'google.', 'blogger.', 'youtube.', 'googlenewsblog.'}
+        new_urls = set()
+        for url in urls:
+            is_root_url = any(url.endswith(j) for j in bad_domains)
+            is_not_relevant = any(j in url for j in false_urls)
+            if url.startswith('http') and not (is_root_url or is_not_relevant):
+                new_urls.add(url)
+        return new_urls
