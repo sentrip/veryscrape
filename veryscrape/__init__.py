@@ -2,8 +2,9 @@ import asyncio
 import json
 import os
 import re
-from collections import namedtuple
-from functools import wraps
+import time
+from collections import namedtuple, defaultdict
+from functools import wraps, partial
 from random import SystemRandom
 
 import aiohttp
@@ -82,3 +83,20 @@ def load_query_dictionary(file_name):
             x, y = l.split(':')
             queries[x] = y.split(',')
     return queries
+
+
+def queue_filter(queue, interval=60):
+        data = defaultdict(partial(defaultdict, list))
+        start = time.time()
+        while True:
+            if not queue.empty():
+                item = queue.get_nowait()
+                data[item.topic][item.source].append(item.content)
+            if time.time() - start >= interval:
+                start = time.time()
+                averages = {k: {t: sum(s)/max(1, len(s)) for t, s in qs.items()} for k, qs in data.items()}
+                yield averages
+                for k, qs in data.items():
+                    for t in qs:
+                        data[k][t] = []
+
