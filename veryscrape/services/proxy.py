@@ -7,7 +7,20 @@ import aiohttp
 import aiohttp.web as web
 from aiohttp.client_exceptions import ClientError
 
-from veryscrape import ExponentialBackOff, BASE_DIR
+
+def retry(n=5, wait_factor=2):
+    def wrapper(fnc):
+        async def inner(*args, **kwargs):
+            wait, c = 1, 1
+            while c <= n:
+                try:
+                    return await fnc(*args, **kwargs)
+                except:
+                    await asyncio.sleep(wait)
+                    wait *= wait_factor
+                c += 1
+        return inner
+    return wrapper
 
 
 class Proxy:
@@ -46,15 +59,14 @@ class Proxy:
         return 'Proxy({:4s}, {:.1f})'.format(self.protocol, self.speed)
 
 
+@retry()
 async def random_proxy(session, url):
-    waiter = ExponentialBackOff(1)
-    async for _ in waiter:
-        async with session.get(url) as response:
-            try:
-                j = await response.json()
-                return Proxy(**j)
-            except ClientError:
-                pass
+    async with session.get(url) as response:
+        try:
+            j = await response.json()
+            return Proxy(**j)
+        except ClientError:
+            pass
 
 
 class ProxyServer(web.Server):
@@ -97,12 +109,8 @@ class ProxyServer(web.Server):
             return web.Response(text="Incorrectly formatted request", status=404)
 
 
-def read_key():
-    with open(BASE_DIR + 'lib/api/proxy.txt') as f:
-        return f.read()
-
 async def proxy_server(address):
-    params = {'apiKey': read_key(), 'protocol': 'http'}
+    params = {'apiKey': '', 'protocol': 'http'}
     base = 'https://api.getproxylist.com/proxy?' + urlencode(params)
     loop = asyncio.get_event_loop()
 
