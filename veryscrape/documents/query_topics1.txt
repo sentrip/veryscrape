@@ -1,0 +1,2 @@
+ATVI:activision blizzard,call of duty,guitar hero,world of warcraft,skylanders,overwatch league,warcraft,COD,overwatch,hearthstone,blizzard
+FB:facebook,mark zuckerberg,likes,whatsapp,facebook messenger,facebook wall

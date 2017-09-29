@@ -1,0 +1,110 @@
+ATVI:activision blizzard,call of duty,guitar hero,world of warcraft,skylanders,overwatch league,warcraft,COD,overwatch,hearthstone,blizzard
+VIAB:viacom,paramount pictures,mtv,nickelodeon,bellator mma,bet networks,comedy central
+M:macy's,bloomingdale’s,macy’s furniture gallery,herald square,bluemercury,macy’s backstage
+FB:facebook,mark zuckerberg,likes,whatsapp,facebook messenger,facebook wall
+COST:costco wholesale corp,costco,cash and carry,costco warehouse,kirkland signature,costco cash card,costco connection
+GE:general electric,ge,ge aviation,ge capital,ge healthcare,ge lighting,ge oil and gas
+HD:home depot,homer d. poe,interline brands,wilmar industries,us lock,husky tools,home depot fuel
+DLPH:delphi automotive,delphi,enerdel,condumex,delphi parts,delphi automotive
+HPQ:hp,hewlettpackard,hp indigo,hp computers,hp printer,hp cartridge,hp ink
+JNJ:johnson & johnson,janssen pharmaceuticals,ethicon,remicade,concerta,tylenol,neutrogena,acuvue,bandaid
+MET:metlife,metropolitan life,metlife bank,metropolitan property,hyatt legal,general american,metlife auto & home
+WMT:walmart stores,walmart,sam’s club,asda,amigo supermarkets,vudu,massmart,seiyu group,bompreco,walton family
+CL:colgatepalmolive,ajax,hill’s,sane,colgate,palmolive
+V:visa,visa card,visanet,visa checkout,visa electron,verified by visa,v pay,visa paywave,visa debit
+WHR:whirlpool,maytag,kitchenaid,indesit,hotpoint,jennair,ariston
+ORCL:oracle corp,oracle,larry ellison,java,oracle database,oracle cloud,mysql
+SYMC:symantec,symantec antivirus,symantec client security,symantec endpoint,symantec system center,norton utilities
+HSY:hershey,almond joy,hershey’s kisses,reese’s peanut,reese’s pieces,mounds bar
+TGT:target,archer farms,market pantry,simply balanced,mossimo supply co,sutton & dodge,pillowfort,cat and jack,up & up,bullseye dog,citytarget,targetexpress
+VZ:verizon communications,verizon,verizon wireless,verizon enterprise solutions,verizon oath,centurylink
+GILD:gilead sciences,biopharmaceutical,harvoni,sovaldi,sofosbuvir,pharmasset,kite pharma
+OMC:omnicom group,omnicom,bbdo,ddb,tbwa,the integer group,omd
+C:citigroup,citibank,citi,citicorp,citimortgage,napier park
+CAT:caterpillar,caterpillar defense products,cat machines,cat harvesters
+CTSH:cognizant technology solutions,cognizant community,digital consulting,francisco d’souza
+DLTR:dollar tree,onedollar store,lowend retail,bob sasser
+MSFT:microsoft,microsoft windows,microsoft office,skype,xbox,linkedin,bing,azuree,microsoft surface,minecraft
+ECL:ecolab,nalco,swisher hygiene,hygiene technologies,sanitizing solutions,cascade investment
+VRSN:verisign,toplevel domains,internet domains,ddos
+GM:general motors,gm,buick,chevrolet,cadillac,gmc
+URBN:urban outfitters,anthropologie,free people,bhldn,the vetri family
+TWX:time warner,hbo,warner bros,cartoon network,cnn,dc entertainment,turner media
+RHT:red hat,red hat enterprise linux,jboss,fedora,dogtail,opensource.com,openshift
+GRMN:garmin,gps navigation,garry burrell,ikubu,nuvi,zumo navigation,nuvifone,forerunner
+BAC:bank of america,boa,biggest american bank,erica banking,gwim,gcib
+MDLZ:mondelez international,oreo,chips ahoy,tuc,belvita,milka,cadbury,halls,lu
+AAPL:apple,iphone,imac,apple watch,ios,ipad,macos,mac
+MCD:mcdonald’s,mcdrive,mccafe,big mac,mac,mcexpress,mcdonaldland,ronald mcdonald
+PFE:pfizer,g.d.searle,hospira,liptor,lyrica,zyvox,zoloft,diflucan,viagra,zithromax
+EA:electronic arts. ea,simcity,fifa series,the sims series,bioware,criterion games
+URI:united rentals,industrial equipment rental
+AIG:american international group,underwriter,aig life and retirement,aig property casualty,brian duperreault,aig insurance
+XOM:exxon mobil,exxon,esso,mobil oil,imperial oil,area energy,exxonmobil
+EBAY:ebay,online auction,kijiji,gumtree,ibazar,stubhub,ebayclassifieds
+KORS:michael kors holdings,mk fashion,mk handbags,mk apparel,michael kors,jimmy choo
+EXPE:expedia,hotels.com,triage,venere,travelocity,órbitz,homeaway
+MRK:merck & co,gardasil,singulair,propecia,zocor,vioxx,fosamax,keytruda,januvia,zetia,mectizan
+CSCO:cisco systems,cisco,opendns,weber,jasper,waas,cleo,devnet
+ROST:ross stores,dress for less,typically ross,dd’s discounts,ross department store
+YUM:yum brands,kfc,pizza hut,taco bell,wingstreet,yum!
+CBS:cbs,viacom,cbs studios,national amusements,cbs on demand,extant,under the dome
+PEP:pepsico,pepsi,doritos,lipton,miranda,7 up,tropicana,mountain dew,lay’s,gatorade,doritos
+XRX:xerox corp,xerox,xerox copier,xerox digital printer,fuji xerox,workcentre,phaser,igen,numera,docuprint
+NTAP:netapp,altavault,netapp filer,netapp on command,data ontap,write anywhere file layout
+GPS:gap,banana republic,old navy,athleta,intermix,gap clothing
+MSI:motorola solutions,motorola,lte broadband systems,tetra system,scada systems,mibas,mototrbo
+NKE:nike,air max,air jordan,nike blazers,nike+,phil knight,converse,hurley international,nike skateboarding,nike air force
+HAS:hasbro,hassenfeld brothers,playskool,tonka,tiger electronics,hasbro studios,funskool,transformers,action man,monopoly,cluedo
+BA:boeing,dreamliner,super hornet,bca,bds,777
+ADSK:autodesk,autocad,revit,maya software,autodesk rendering,softimage
+AXP:american express,amex,traveler’s cheques,travelers cheque card,amex credit card,multinational financial services
+SBUX:starbucks,teavana,frappuccino,la boulange,starbucks verismo,starbucks ethos
+PCLN:priceline group,booking.com,priceline.com,agoda.com,kayak.com,rentalcars.com,mundi,opentable
+AMZN:amazon.com,amazon,kindle,icloud,jeff bezos,amazon echo,zappos,amazon books,twitch
+FSLR:first solar,american photovoltaic,cdte,cdte panels,mark widmarpv systems
+HOT:henderson opportunities trust,interactive investor,alliance trust savings,janus henderson,intact
+PG:procter & gamble,ariel,olay,gillette,vicks,pantene,tampax,pampers,oralb
+TXN:texas instruments,dlp,ti,sitara,dlp cinema,webench,jaguar motor controller,aurasonics,davinci software,dsp processor
+RL:ralph lauren corp,club monaco,polo,polo jeans,polo ralph lauren,double rl,polo sport,rl restaurants,ralph’s coffee
+LOW:lowe’s,orchard supply hardware,rona,lowe’s hardware,wdr delaware corporation
+MU:micron technology,micron,lexar,crucial technology,im flash technologies,nand flash memory,tidal systems
+CRM:salesforce.com,quip,demandware,heroic,force app cloud,community cloud,apex
+SPLS:staples,staples@ arc,brighton professional,staples sustainable earth,mailmate
+STZ:constellation brands,corona,model especial,negra modelo,pacifico,ballast point,svedka vodka,rober mondavi,clos du bois
+JWN:nordstrom,hautelook,nordstrom rack,trunk club,nordstrom department store,jeffrey boutique
+DISCA:discovery communications,discovery,all3media,lionsgate,group nine media,discovery networks,animal planet,science channel,eurosport,tlc
+WDC:western digital,wd,hgst,sandisk,data lifeguard tools,wd my passport,wd my book,wd my cloud,tour mobile hard drive,wd raptor
+KO:cocacola,coke,minute maid,sprite,fanta,powerade,vio
+AZO:autozone,autoanything,duralast,valucraft,automotive parts
+DPS:dr pepper snapple group,dr pepper,snapple,7 up,schweppes,canada dry,rc cola,orangina
+MA:mastercard,maestro,cirrus,mastercard contactless,banknet,qkr
+WU:western union,wu,cablegrams,bidpay,western union connect
+MAT:mattel,fisher price,barbie doll,matchbox,masters of the universe,mega brands,fuhu,playground productions
+MOS:mosaic,mosaic fertilizer,microessentials,kmag,mosaic pegasus,mosaic potash
+PM:philip morris international,philip morris,pmi,zlgfiz,marlboro,rothmans,benson & hedges,l&m
+NVDA:nvidia,shield portable,shield tablet,tegra mobile processors,geforce,nforce,quadro,dgx1
+NFLX:netflix,netflix international,netflix streaming services,netflix studios,millarworld,netflix original
+ACN:accenture  accenture,accenture consulting,business strategy,accenture technology strategy,accenture digital marketing,analytics
+T:at&t,southwestern bell,pacific bell,alascom,cricket wireless,directv,bellsouth,otter media,quickplay media
+BBY:best buy,geek squad,magnolia audio video,pacific sales,dynex,rocketfish
+FL:foot locker,footaction,runner’s point,sidestep,eastbay,champs sports,house of hoops
+TRIP:tripadvisor,bookingbuddy,niumba,seat guru,flipkey,holiday lettings,travelpod
+CMG:chipotle mexican grill,pizzeria locale,tasty made,farm team,fast burritos
+MHK:mohawk industries,american clean,bigelow,columbia wood flooring,pergo,mohawk laminated flooring
+BBBY:bed bath & beyond,cost plus,buy buy baby,one kings lane,linen holdings
+ADBE:adobe systems  adobe,adobe acrobat,photoshop,indesign,adobe illustrator,adobe premiere
+INTC:intel,microprocessor,flash memory,client computing group,internet of things group,nand,pentium,sandy bridge
+CTXS:citrix systems,citrix,virtualization software,das,saas,xendesktop,xenclient,netscaler
+GS:goldman sachs group,multinational finance,investment banking,gs bank usa,marcus by goldman sachs,setlcoin
+NWSA:news corp,news limited,the times,the sun,harpercollins,fox entertainment group,rupert murdoch,the sunday times,the new york post,the wall street journal,20th century fox,national geographic channel
+GOOG:alphabet,google,larry page,sergey brin,calico,capitalg,deepmind,nest labs,youtube,android
+MS:morgan stanley,institutional securities group,global wealth management group,smith barney,morgan stanley liquidity funds,global brands equity income fund
+STT:state street,state street global advisors,state street global markets,state street global services,one lincoln street
+IBM:international business machines,ibm,big blue,ginni rometty,thomas j. watson,cognitive computing
+DIS:walt disney,disneyland,disneyworld,abc network,walt disney studio,espn,pixar,lucasfilm
+WFC:wells fargo,wf community banking,wells fargo securities,wells fargo rail,wells fargo advisers
+FDX:fedex corp,fedex,federal express,fedex express,fedex smart post,fedex ground
+QCOM:qualcomm,cdma chipset,wcdma chipset,snapdragon,omnitracs,mediaflo,qchat,uione,mirasol
+TIF:tiffany & co,tiffany,tiffany’s,tiffany jewelry,tiffany fragrances,tiffany blue book
+F:ford motor co,ford,ford focus,lincoln,ford ka,ford fiesta,ford mondeo,ford transit,motorcraft

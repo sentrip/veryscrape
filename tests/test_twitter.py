@@ -1,25 +1,20 @@
-import asyncio
 import json
 import unittest
 from collections import namedtuple
-from functools import wraps
 from io import BytesIO
 
-import veryscrape
+from veryscrape import synchronous, get_auth, Producer
 from veryscrape.extensions.twitter import Twitter, ReadBuffer
-
-
-def run_async(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        l = asyncio.get_event_loop()
-        return l.run_until_complete(f(*args, **kwargs))
-    return wrapper
 
 
 class TestTwitter(unittest.TestCase):
     def setUp(self):
-        self.auth = veryscrape.Producer.load_authentications('twitter.txt')
+        @synchronous
+        async def f():
+            return await get_auth('twitter')
+        auth = f()
+        self.topics = Producer.load_query_dictionary('query_topics')
+        self.auth = {k: a for k, a in zip(sorted(self.topics.keys()), auth)}
 
     def test_readbuffer_small_stream(self):
         tweets = [{'status': 'This tweet'}, {'status': 'This tweet'}]
@@ -27,7 +22,7 @@ class TestTwitter(unittest.TestCase):
         mock_stream = BytesIO(mock_stream_content)
         mock_stream.headers = {}
 
-        @run_async
+        @synchronous
         async def read():
             buf = ReadBuffer(mock_stream)
             async for item in buf:
@@ -41,7 +36,7 @@ class TestTwitter(unittest.TestCase):
         mock_stream_content = bytes(s.format(*list(map(json.dumps, tweets))), encoding='utf-8')
         mock_stream = ms(BytesIO(mock_stream_content), {})
 
-        @run_async
+        @synchronous
         async def read():
             buf = ReadBuffer(mock_stream)
             async for item in buf:
@@ -51,7 +46,7 @@ class TestTwitter(unittest.TestCase):
     def test_twitter_acquire_stream(self):
         params = {'language': 'en', 'track': 'apple'}
 
-        @run_async
+        @synchronous
         async def read():
             twitter = Twitter(self.auth['FB'])
             raw = await twitter.request('POST', 'statuses/filter.json', params=params, oauth=1, stream=True)
@@ -60,7 +55,7 @@ class TestTwitter(unittest.TestCase):
         read()
 
     def test_twitter_filter_stream_no_proxy(self):
-        @run_async
+        @synchronous
         async def read():
             twitter = Twitter(self.auth['AAPL'])
             await twitter.filter_stream('apple', 'AAPL', duration=1, use_proxy=False)
@@ -68,7 +63,7 @@ class TestTwitter(unittest.TestCase):
         read()
 
     def test_twitter_filter_stream_proxy(self):
-        @run_async
+        @synchronous
         async def read():
             twitter = Twitter(self.auth['AAPL'])
             await twitter.filter_stream('apple', 'AAPL', duration=1, use_proxy=True)

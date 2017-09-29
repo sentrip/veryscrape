@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from urllib.parse import urlencode
 
-from veryscrape import SearchClient
+from veryscrape import SearchClient, async_run_forever
 
 
 class Reddit(SearchClient):
@@ -63,3 +63,7 @@ class Reddit(SearchClient):
                 break
             else:
                 await asyncio.sleep(30)
+
+    @async_run_forever
+    async def stream(self, track=None, topic=None, duration=10800):
+        await self.comment_stream(track, topic, duration)

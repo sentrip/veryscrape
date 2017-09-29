@@ -12,7 +12,7 @@ class TestProxy(unittest.TestCase):
         assert r.text.startswith('http'), 'Invalid proxy returned'
 
     def test_proxy_request_correct_params(self):
-        r = requests.get(self.server, params={'speed': 150, 'https': '1'})
+        r = requests.get(self.server, params={'speed': 150, 'https': 1})
         assert r.status_code == 200, 'Request for proxy failed'
         assert r.text.startswith('http'), 'Invalid proxy returned'
 

@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from veryscrape import SearchClient, ReadBuffer
+from veryscrape import SearchClient, ReadBuffer, async_run_forever
 
 
 class Twitter(SearchClient):
@@ -37,3 +37,7 @@ class Twitter(SearchClient):
 
                 if time.time() - start_time >= duration:
                     break
+
+    @async_run_forever
+    async def stream(self, track=None, topic=None, duration=3600, use_proxy=False):
+        await self.filter_stream(track, topic, duration, use_proxy)
