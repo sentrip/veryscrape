@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import re
-import time
 from collections import namedtuple
 from functools import wraps
 from random import SystemRandom
@@ -83,47 +82,3 @@ def load_query_dictionary(file_name):
             x, y = l.split(':')
             queries[x] = y.split(',')
     return queries
-
-
-class ReadBuffer:
-    def __init__(self, stream, chunk_size=1024):
-        enc_search = re.search('charset=(?P<enc>\S*)', stream.headers.get('content-type', ''))
-        self.encoding = enc_search.group('enc') if enc_search is not None else 'utf-8'
-        self.buffer = b''
-        self.chunk_size = chunk_size
-        self.raw = stream
-
-    def __aiter__(self):
-        return self
-
-    async def next_chunk(self):
-        chunk = b''
-        try:
-            chunk = await self.raw.read(self.chunk_size)
-            self.buffer += chunk
-        except (aiohttp.Timeout, aiohttp.ClientPayloadError):
-            self.raw.close()
-        finally:
-            if not chunk:
-                raise StopAsyncIteration
-
-    async def next_item(self):
-        item = b''
-        while not item:
-            index = self.buffer.find(b'\n')
-            if index > -1:
-                item, self.buffer = self.buffer[:index], self.buffer[index + 1:]
-                if item == b'\r':
-                    item = b''
-            else:
-                await self.next_chunk()
-        return item
-
-    async def __anext__(self):
-        item = await self.next_item()
-        status = json.loads(item.decode(self.encoding))
-        if 'limit' in status:
-            await asyncio.sleep((float(status['limit']['track']) + float(
-                status['limit']['timestamp_ms'])) / 1000 - time.time())
-            status = await self.__anext__()
-        return status
