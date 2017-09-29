@@ -91,7 +91,6 @@ class TestSearchClient(unittest.TestCase):
     def test_extract_urls(self):
         urls = ['http://google.com/', 'http://myblogspot.blog.com/thing/article/1034.php']
         self.client.clean_urls(urls)
-        print(urls)
         assert len(urls) == 1, 'Urls were not successfully cleaned'
 
 if __name__ == '__main__':
