@@ -3,7 +3,7 @@ import unittest
 from collections import namedtuple
 from io import BytesIO
 
-from veryscrape import synchronous, get_auth, Producer
+from veryscrape import synchronous, get_auth, load_query_dictionary
 from veryscrape.extensions.twitter import Twitter, ReadBuffer
 
 
@@ -13,7 +13,7 @@ class TestTwitter(unittest.TestCase):
         async def f():
             return await get_auth('twitter')
         auth = f()
-        self.topics = Producer.load_query_dictionary('query_topics')
+        self.topics = load_query_dictionary('query_topics')
         self.auth = {k: a for k, a in zip(sorted(self.topics.keys()), auth)}
 
     def test_readbuffer_small_stream(self):

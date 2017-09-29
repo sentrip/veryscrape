@@ -1,7 +1,7 @@
 import unittest
 from multiprocessing import Queue
 
-from veryscrape import synchronous, Item, Producer
+from veryscrape import synchronous, Item, load_query_dictionary
 from veryscrape.extensions.download import Download
 
 
@@ -10,7 +10,7 @@ class TestDownload(unittest.TestCase):
     result_queue = Queue()
 
     def setUp(self):
-        self.topics = Producer.load_query_dictionary('query_topics')
+        self.topics = load_query_dictionary('query_topics')
 
     @synchronous
     async def test_download_small_url_set(self):

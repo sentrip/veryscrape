@@ -1,7 +1,7 @@
 import unittest
 from multiprocessing import Queue
 
-from veryscrape import Producer, synchronous, get_auth
+from veryscrape import load_query_dictionary, synchronous, get_auth
 from veryscrape.extensions.twingly import Twingly
 
 
@@ -11,7 +11,7 @@ async def f():
 
 
 class TestTwingly(unittest.TestCase):
-    topics = Producer.load_query_dictionary('query_topics')
+    topics = load_query_dictionary('query_topics')
     topic = next(iter(list(topics.keys())))
     q = 'tesla'
     auth = f()[1][0]

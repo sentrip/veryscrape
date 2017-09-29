@@ -3,7 +3,8 @@ import time
 from collections import defaultdict
 from urllib.parse import urlencode
 
-from veryscrape import SearchClient, async_run_forever
+from veryscrape import async_run_forever
+from veryscrape.client import SearchClient
 
 
 class Reddit(SearchClient):
@@ -27,14 +28,14 @@ class Reddit(SearchClient):
 
     async def get_links(self, track, **params):
         url = self.link_url.format(track, ('&' + urlencode(params)) if params else '')
-        resp = await self.request('GET', url, oauth=2, return_json=True)
+        resp = await self.get(url, oauth=2, return_json=True)
         self.last_id = resp['data']['after'] or ''
         links = {i['data']['id']: i['data']['created_utc'] for i in resp['data']['children']}
         return links
 
     async def get_comments(self, track, link, **params):
         url = self.comment_url.format(track, link, ('&' + urlencode(params)) if params else '')
-        resp = await self.request('GET', url, oauth=2, return_json=True)
+        resp = await self.get(url, oauth=2, return_json=True)
         comments = resp[1]['data']['children']
         return comments
 

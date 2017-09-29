@@ -1,6 +1,6 @@
 import unittest
 
-from veryscrape import Producer, synchronous, get_auth
+from veryscrape import load_query_dictionary, synchronous, get_auth
 from veryscrape.extensions.reddit import Reddit
 
 
@@ -11,7 +11,7 @@ async def f():
 
 class RedditTest(unittest.TestCase):
     auths = f()
-    topics = Producer.load_query_dictionary('subreddits')
+    topics = load_query_dictionary('subreddits')
     auth = {k: a for k, a in zip(sorted(topics.keys()), auths)}
     topic = next(iter(list(topics.keys())))
     q = 'all'
