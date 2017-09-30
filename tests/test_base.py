@@ -4,7 +4,7 @@ import time
 import unittest
 from multiprocessing import Queue
 
-from veryscrape import Item, load_query_dictionary, queue_filter, synchronous, retry
+from veryscrape import Item, load_query_dictionary, queue_filter, synchronous, retry, get_auth
 
 
 class TestBASE(unittest.TestCase):
@@ -56,14 +56,6 @@ class TestBASE(unittest.TestCase):
             assert fd == diff, 'Fail time difference not correct, {}'.format(fd)
             diff *= 2
 
-    @synchronous
-    async def test_async_run_forever(self):
-        pass
-
-    @synchronous
-    async def test_get_auth(self):
-        pass
-
     def test_synchronous(self):
         @synchronous
         async def t():
@@ -78,6 +70,17 @@ class TestBASE(unittest.TestCase):
         d = load_query_dictionary('subreddits')
         assert len(d) == 110, 'Dictionary length incorrect'
         assert all(q for _, q in d.items())
+
+    @synchronous
+    async def test_get_auth(self):
+        p = await get_auth('proxy')
+        assert len(p) > 0 and isinstance(p[0][0], str), 'Incorrect proxy auth returned, {}'.format(p)
+        r = await get_auth('reddit')
+        assert len(r) > 100 and isinstance(r[0][0], str), 'Incorrect reddit auth returned, {}'.format(r)
+        t = await get_auth('twitter')
+        assert len(t) > 100 and isinstance(t[0][0], str), 'Incorrect twitter auth returned, {}'.format(t)
+        tw = await get_auth('twingly')
+        assert len(tw) > 0 and isinstance(tw[0][0], str), 'Incorrect twingly auth returned, {}'.format(tw)
 
 if __name__ == '__main__':
     unittest.main()

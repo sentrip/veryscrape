@@ -11,7 +11,7 @@ import aiohttp
 
 random = SystemRandom().random
 
-linux_path, windows_path = "/home/djordje/veryscrape/veryscrape/documents",  "C:/users/djordje/desktop/lib/documents"
+linux_path, windows_path = "/home/djordje/veryscrape/veryscrape/documents", "C:/users/djordje/desktop/lib/documents"
 BASE_DIR = linux_path if os.path.isdir(linux_path) else windows_path
 Item = namedtuple('Item', ['content', 'topic', 'source'])
 Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))

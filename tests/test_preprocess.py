@@ -4,6 +4,8 @@ import unittest
 from collections import defaultdict
 from multiprocessing import Queue
 
+import numpy as np
+
 from veryscrape import Item
 from veryscrape.extensions.preprocess import PreProcessor
 
@@ -61,7 +63,10 @@ class TestPreProcess(unittest.TestCase):
         pass
 
     def test_feature_convert(self):
-        pass
+        sent = 'hello this is my sentence, i would like to test the feature conversion! please give me a good matrix.'
+        item = self.client.feature_convert(Item(sent, '', ''))
+        assert item.content.shape == (30, 30), "Incorrect shape of features returned, {}".format(item.content.shape)
+        assert np.sum(np.sum(item.content, axis=1)) > 0, 'No words were found'
 
 if __name__ == '__main__':
     unittest.main()
