@@ -3,15 +3,15 @@ import json
 import os
 import re
 import time
-from collections import namedtuple
-from functools import wraps
+from collections import namedtuple, defaultdict
+from functools import wraps, partial
 from random import SystemRandom
 
 import aiohttp
 
 random = SystemRandom().random
 
-linux_path, windows_path = "/home/djordje/veryscrape/veryscrape",  "C:/users/djordje/desktop/lib"
+linux_path, windows_path = "/home/djordje/veryscrape/veryscrape/documents",  "C:/users/djordje/desktop/lib"
 BASE_DIR = linux_path if os.path.isdir(linux_path) else windows_path
 Item = namedtuple('Item', ['content', 'topic', 'source'])
 Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
@@ -77,7 +77,7 @@ async def get_auth(t):
 def load_query_dictionary(file_name):
     """Loads query topics and corresponding queries from disk"""
     queries = {}
-    with open(os.path.join(BASE_DIR, 'documents', '%s.txt' % file_name), 'r') as f:
+    with open(os.path.join(BASE_DIR, '%s.txt' % file_name), 'r') as f:
         lns = f.read().splitlines()
         for l in lns:
             x, y = l.split(':')
@@ -85,45 +85,17 @@ def load_query_dictionary(file_name):
     return queries
 
 
-class ReadBuffer:
-    def __init__(self, stream, chunk_size=1024):
-        enc_search = re.search('charset=(?P<enc>\S*)', stream.headers.get('content-type', ''))
-        self.encoding = enc_search.group('enc') if enc_search is not None else 'utf-8'
-        self.buffer = b''
-        self.chunk_size = chunk_size
-        self.raw = stream
-
-    def __aiter__(self):
-        return self
-
-    async def next_chunk(self):
-        chunk = b''
-        try:
-            chunk = await self.raw.read(self.chunk_size)
-            self.buffer += chunk
-        except (aiohttp.Timeout, aiohttp.ClientPayloadError):
-            self.raw.close()
-        finally:
-            if not chunk:
-                raise StopAsyncIteration
-
-    async def next_item(self):
-        item = b''
-        while not item:
-            index = self.buffer.find(b'\n')
-            if index > -1:
-                item, self.buffer = self.buffer[:index], self.buffer[index + 1:]
-                if item == b'\r':
-                    item = b''
-            else:
-                await self.next_chunk()
-        return item
-
-    async def __anext__(self):
-        item = await self.next_item()
-        status = json.loads(item.decode(self.encoding))
-        if 'limit' in status:
-            await asyncio.sleep((float(status['limit']['track']) + float(
-                status['limit']['timestamp_ms'])) / 1000 - time.time())
-            status = await self.__anext__()
-        return status
+def queue_filter(queue, interval=60):
+        data = defaultdict(partial(defaultdict, list))
+        start = time.time()
+        while True:
+            if not queue.empty():
+                item = queue.get_nowait()
+                data[item.topic][item.source].append(item.content)
+            if time.time() - start >= interval:
+                start = time.time()
+                averages = {k: {t: sum(s)/max(1, len(s)) for t, s in qs.items()} for k, qs in data.items()}
+                yield averages
+                for k, qs in data.items():
+                    for t in qs:
+                        data[k][t] = []
