@@ -11,33 +11,34 @@ import aiohttp
 
 random = SystemRandom().random
 
-linux_path, windows_path = "/home/djordje/veryscrape/veryscrape/documents",  "C:/users/djordje/desktop/lib"
+linux_path, windows_path = "/home/djordje/veryscrape/veryscrape/documents",  "C:/users/djordje/desktop/lib/documents"
 BASE_DIR = linux_path if os.path.isdir(linux_path) else windows_path
 Item = namedtuple('Item', ['content', 'topic', 'source'])
 Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
 
 
-def retry_handler(ex):
-    print(repr(ex), 'retry')
+def retry_handler(ex, test=False):
+    if not test:
+        print(repr(ex), 'retry')
 
 
 def run_handler(ex):
     print(repr(ex), 'run')
 
 
-def retry(n=5, wait_factor=2):
+def retry(n=5, wait_factor=2, initial_wait=1, test=False):
     def wrapper(fnc):
         async def inner(*args, **kwargs):
-            wait, c = 1, 1
+            wait, c = initial_wait, 1
             while c <= n:
                 try:
                     return await fnc(*args, **kwargs)
                 except Exception as e:
-                    retry_handler(e)
+                    retry_handler(e, test)
                     await asyncio.sleep(wait)
                     wait *= wait_factor
                 c += 1
-            retry_handler(Exception('Function `{}` exceeded maximum allowed number of retries'.format(fnc.__name__)))
+            raise TimeoutError('Function `{}` exceeded maximum allowed number of retries'.format(fnc.__name__))
         return inner
     return wrapper
 
