@@ -64,8 +64,9 @@ async def random_proxy(session, url):
     async with session.get(url) as response:
         try:
             j = await response.json()
+            assert j['ip']
             return Proxy(**j)
-        except ClientError:
+        except (ClientError, AssertionError, KeyError):
             pass
 
 
@@ -87,14 +88,13 @@ class ProxyServer(web.Server):
                     else:
                         good = good or proxy not in self.used_proxies
             if good:
-                if len(self.proxies) > 1:
-                    return self.proxies.pop(index).full_address
-                else:
-                    if proxy in self.fast_proxies:
-                        self.fast_proxies.remove(proxy)
-                    if proxy not in self.used_proxies:
-                        self.used_proxies.append(proxy)
-                    return proxy.full_address
+                if proxy in self.fast_proxies:
+                    self.fast_proxies.remove(proxy)
+                if proxy not in self.used_proxies:
+                    self.used_proxies.append(proxy)
+                    if len(self.proxies) > 1:
+                        return self.proxies.pop(index).full_address
+                return proxy.full_address
         else:
             raise TypeError('Couldn\'t find you a proxy')
 
@@ -126,9 +126,10 @@ async def proxy_server(address):
             if len(server.proxies) - len(server.used_proxies) <= proxies_required or len(server.fast_proxies) < int(proxies_required / 5):
                 new_proxies = await asyncio.gather(*[random_proxy(session, base) for _ in range(concurrent_requests)])
                 for proxy in new_proxies:
-                    heapq.heappush(server.proxies, proxy)
-                    if proxy.speed > 100:
-                        server.fast_proxies.append(proxy)
+                    if proxy is not None:
+                        heapq.heappush(server.proxies, proxy)
+                        if proxy.speed > 100:
+                            server.fast_proxies.append(proxy)
             await asyncio.sleep(1)
         except KeyboardInterrupt:
             break
@@ -137,7 +138,33 @@ async def proxy_server(address):
     await server.shutdown()
     loop.close()
 
+
+def hammer():
+    import aiohttp
+    import time
+
+    async def run():
+        async with aiohttp.ClientSession() as sess:
+            c = 0
+            while True:
+                async with sess.get('http://192.168.0.103:9999') as response:
+                    t = await response.text()
+                    if c % 50 == 0: print(t)
+                    c += 1
+                    assert t.startswith('http') or t.startswith('Incorrect'), t
+
+    async def h():
+        time.sleep(3)
+        n = 256
+        while True:
+            await asyncio.gather(*[run() for _ in range(n)])
+    policy = asyncio.get_event_loop_policy()
+    policy.set_event_loop(policy.new_event_loop())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(h())
+
 if __name__ == '__main__':
+    #from multiprocessing import Process; Process(target=hammer).start()
     add = '192.168.0.100', 9999
     main_loop = asyncio.get_event_loop()
     main_loop.run_until_complete(proxy_server(add))

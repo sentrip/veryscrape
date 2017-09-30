@@ -114,18 +114,24 @@ class SearchClient:
             return resp
         else:
             result = await resp.text()
+            resp.close()
             mock_resp = mock_response(resp.status, result)
             return mock_resp
 
     async def close(self):
         await self.session.close()
 
-    @retry(2, wait_factor=1)
+    @retry()
     async def update_proxy(self, proxy_params=None):
         proxy_params = proxy_params or {}
         if self.proxy is None or self.failed:
             resp = await self.session.get(self.proxy_url, params=proxy_params)
-            self.proxy = await resp.text()
+            res = await resp.text()
+            resp.close()
+            if not res.startswith('Incorrect'):
+                self.proxy = res
+            else:
+                raise ConnectionError
 
     @staticmethod
     def clean_urls(urls):
