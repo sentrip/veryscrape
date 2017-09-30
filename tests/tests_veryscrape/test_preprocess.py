@@ -10,24 +10,32 @@ from veryscrape import Item
 from veryscrape.extensions.preprocess import PreProcessor
 
 
+def load_data(pth):
+    tweets = []
+    with open(pth + '/tweets.txt', encoding='utf-8', errors='replace') as f:
+        for i, ln in enumerate(f):
+            tweets.append(ln.strip('\n'))
+    comments = []
+    with open(pth + '/reddit_comments.txt', encoding='utf-8', errors='replace') as f:
+        for ln in f:
+            comments.append(ln.strip('\n'))
+    sep = '|S|P|E|C|I|A|L|S|E|P|'
+    with open(pth + '/htmls.txt') as f:
+        data = f.read()
+        htmls = data.split(sep)
+    return tweets, comments, htmls
+
+
 class TestPreProcess(unittest.TestCase):
     input_queue = Queue()
     output_queue = Queue()
     client = PreProcessor(input_queue, output_queue)
     client.bigram = client.load_ngram()
     client.vocab = client.load_vocab()
-    tweets = []
-    with open('data/tweets.txt', encoding='utf-8', errors='replace') as f:
-        for i, ln in enumerate(f):
-            tweets.append(ln.strip('\n'))
-    comments = []
-    with open('data/reddit_comments.txt', encoding='utf-8', errors='replace') as f:
-        for ln in f:
-            comments.append(ln.strip('\n'))
-    sep = '|S|P|E|C|I|A|L|S|E|P|'
-    with open('data/htmls.txt') as f:
-        data = f.read()
-        htmls = data.split(sep)
+    try:
+        tweets, comments, htmls = load_data('data')
+    except FileNotFoundError:
+        tweets, comments, htmls = load_data('tests_veryscrape/data')
 
     def tearDown(self):
         while not self.input_queue.empty():
