@@ -5,7 +5,7 @@ import time
 
 import aiohttp
 
-from veryscrape import async_run_forever
+from veryscrape import async_run_forever, Item
 from veryscrape.client import SearchClient
 
 
@@ -60,9 +60,10 @@ class Twitter(SearchClient):
     retry_420 = 60
     snooze_time = 0.25
 
-    def __init__(self, auth):
+    def __init__(self, auth, queue):
         super(Twitter, self).__init__()
         self.client, self.secret, self.token, self.token_secret = auth
+        self.queue = queue
 
     async def filter_stream(self, track=None, topic=None, duration=3600, use_proxy=False):
         start_time = time.time()
@@ -81,7 +82,7 @@ class Twitter(SearchClient):
             self.snooze_time = 0.25
             buffer = ReadBuffer(raw)
             async for status in buffer:
-                await self.send_item(status['text'], topic, 'twitter')
+                await self.queue.put(Item(status['text'], topic, 'twitter'))
                 await asyncio.sleep(self.snooze_time)
 
                 if time.time() - start_time >= duration:

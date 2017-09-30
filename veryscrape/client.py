@@ -127,10 +127,6 @@ class SearchClient:
             resp = await self.session.get(self.proxy_url, params=proxy_params)
             self.proxy = await resp.text()
 
-    @retry(2, wait_factor=1)
-    async def send_item(self, content, topic, source):
-        return await self.session.post(self.item_url, data={'content': content, 'topic': topic, 'source': source})
-
     @staticmethod
     def clean_urls(urls):
         bad_domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}

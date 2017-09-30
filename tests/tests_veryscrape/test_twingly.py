@@ -1,5 +1,5 @@
+import asyncio
 import unittest
-from multiprocessing import Queue
 
 from veryscrape import load_query_dictionary, synchronous, get_auth
 from veryscrape.extensions.twingly import Twingly
@@ -15,15 +15,17 @@ class TestTwingly(unittest.TestCase):
     topic = next(iter(list(topics.keys())))
     q = 'tesla'
     auth = f()[1][0]
-    url_queue = Queue()
 
     @synchronous
     async def setUp(self):
+        self.url_queue = asyncio.Queue()
         self.client = Twingly(self.auth, self.url_queue)
 
     @synchronous
     async def tearDown(self):
         await self.client.close()
+        while not self.url_queue.empty():
+            _ = self.url_queue.get_nowait()
 
     @synchronous
     async def test_twingly_single_request(self):

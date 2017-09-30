@@ -1,13 +1,13 @@
+import asyncio
 import unittest
-from multiprocessing import Queue
 
 from veryscrape import synchronous, Item, load_query_dictionary
 from veryscrape.extensions.download import Download
 
 
 class TestDownload(unittest.TestCase):
-    url_queue = Queue()
-    result_queue = Queue()
+    url_queue = asyncio.Queue()
+    result_queue = asyncio.Queue()
 
     def setUp(self):
         self.topics = load_query_dictionary('query_topics')
@@ -19,7 +19,7 @@ class TestDownload(unittest.TestCase):
                 'http://www.businessinsider.com/apple-considers-ditching-intel-making-own-chip-for-mac-laptops-report-2017-9']
         down = Download(self.url_queue, self.result_queue)
         for u in urls:
-            self.url_queue.put(Item(u, 'AAPL', 'article'))
+            await self.url_queue.put(Item(u, 'AAPL', 'article'))
         await down.stream(duration=1)
         assert self.url_queue.empty(), 'Url queue was not purged'
         res = self.result_queue.get_nowait()

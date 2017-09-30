@@ -1,5 +1,5 @@
+import asyncio
 import unittest
-from multiprocessing import Queue
 
 from veryscrape import load_query_dictionary, synchronous
 from veryscrape.extensions.google import Google
@@ -9,10 +9,10 @@ class TestGoogle(unittest.TestCase):
     topics = load_query_dictionary('query_topics')
     topic = next(iter(list(topics.keys())))
     q = 'tesla'
-    url_queue = Queue()
 
     @synchronous
     async def setUp(self):
+        self.url_queue = asyncio.Queue()
         self.client = Google(self.url_queue)
 
     @synchronous

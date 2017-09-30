@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from urllib.parse import urlencode
 
-from veryscrape import async_run_forever
+from veryscrape import async_run_forever, Item
 from veryscrape.client import SearchClient
 
 
@@ -22,9 +22,10 @@ class Reddit(SearchClient):
     links = defaultdict(time.time)
     last_id = ''
 
-    def __init__(self, auth):
+    def __init__(self, auth, queue):
         super(Reddit, self).__init__()
         self.client, self.secret = auth
+        self.queue = queue
 
     async def get_links(self, track, **params):
         url = self.link_url.format(track, ('&' + urlencode(params)) if params else '')
@@ -43,7 +44,8 @@ class Reddit(SearchClient):
         for c in comments:
             if c['kind'] == 't1' and c['data']['id'] not in self.seen_comments:
                 self.seen_comments.add(c['data']['id'])
-                await self.send_item(c['data']['body'], topic, 'reddit')
+                await self.queue.put(Item(c['data']['body'], topic, 'reddit'))
+                #await self.send_item(c['data']['body'], topic, 'reddit')
 
     async def comment_stream(self, track=None, topic=None, duration=10800):
         start_time = time.time()

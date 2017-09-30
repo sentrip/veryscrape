@@ -32,7 +32,7 @@ class Google(SearchClient):
 
             urls = self.extract_urls(resp)
             for url in urls:
-                self.queue.put(Item(url, topic, 'article'))
+                await self.queue.put(Item(url, topic, 'article'))
 
             if time.time() - start_time >= duration:
                 break

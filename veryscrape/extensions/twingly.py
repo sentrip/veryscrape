@@ -39,7 +39,7 @@ class Twingly(SearchClient):
 
             urls = self.extract_urls(resp)
             for url in urls:
-                self.queue.put(Item(url, topic, 'blog'))
+                await self.queue.put(Item(url, topic, 'blog'))
 
             if time.time() - start_time >= duration:
                 break

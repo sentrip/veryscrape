@@ -1,3 +1,4 @@
+import asyncio
 import json
 import unittest
 from collections import namedtuple
@@ -8,13 +9,19 @@ from veryscrape.extensions.twitter import Twitter, ReadBuffer
 
 
 class TestTwitter(unittest.TestCase):
-    def setUp(self):
-        @synchronous
-        async def f():
-            return await get_auth('twitter')
-        auth = f()
+
+    @synchronous
+    async def setUp(self):
         self.topics = load_query_dictionary('query_topics')
-        self.auth = {k: a for k, a in zip(sorted(self.topics.keys()), auth)}
+        self.auth = {k: a for k, a in zip(sorted(self.topics.keys()), await get_auth('twitter'))}
+        self.queue = asyncio.Queue()
+        self.twitter = Twitter(self.auth['FB'], self.queue)
+
+    @synchronous
+    async def tearDown(self):
+        await self.twitter.close()
+        while not self.queue.empty():
+            _ = self.queue.get_nowait()
 
     def test_readbuffer_small_stream(self):
         tweets = [{'status': 'This tweet'}, {'status': 'This tweet'}]
@@ -48,18 +55,14 @@ class TestTwitter(unittest.TestCase):
 
         @synchronous
         async def read():
-            twitter = Twitter(self.auth['FB'])
-            raw = await twitter.request('POST', 'statuses/filter.json', params=params, oauth=1, stream=True)
-            await twitter.close()
+            raw = await self.twitter.request('POST', 'statuses/filter.json', params=params, oauth=1, stream=True)
             assert raw.status == 200, 'Request failed, returned error code {}'.format(raw.status)
         read()
 
     def test_twitter_filter_stream_no_proxy(self):
         @synchronous
         async def read():
-            twitter = Twitter(self.auth['AAPL'])
-            await twitter.filter_stream('apple', 'AAPL', duration=1, use_proxy=False)
-            await twitter.close()
+            await self.twitter.filter_stream('apple', 'AAPL', duration=1, use_proxy=False)
         read()
 
     # def test_twitter_filter_stream_proxy(self):

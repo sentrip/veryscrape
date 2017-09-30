@@ -3,7 +3,6 @@ import asyncio
 import re
 import time
 from contextlib import suppress
-from queue import Empty
 
 from veryscrape import Item
 from veryscrape.client import SearchClient
@@ -23,7 +22,7 @@ class Download(SearchClient):
             encoding = enc_search.group('enc') if enc_search else 'UTF-8'
             html_text = await resp.text(encoding=encoding)
             if resp.status == 200:
-                self.result_queue.put(Item(html_text, item.topic, item.source))
+                await self.result_queue.put(Item(html_text, item.topic, item.source))
             resp.close()
 
     async def stream(self, duration=0):
@@ -32,5 +31,5 @@ class Download(SearchClient):
             try:
                 url = self.url_queue.get_nowait()
                 asyncio.ensure_future(self.download(url))
-            except Empty:
+            except asyncio.queues.QueueEmpty:
                 await asyncio.sleep(0.1)

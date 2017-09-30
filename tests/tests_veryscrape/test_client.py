@@ -23,11 +23,6 @@ class TestSearchClient(unittest.TestCase):
         assert self.client.proxy.startswith('http'), 'Incorrect proxy returned'
 
     @synchronous
-    async def test_send_item(self):
-        resp = await self.client.send_item('TEST', 'test', 'test')
-        assert resp.status == 200, 'Item was not successfully sent'
-
-    @synchronous
     async def test_update_oauth2_token(self):
         auth = await get_auth('reddit')
         self.client.client, self.client.secret = auth[0]
