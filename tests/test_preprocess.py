@@ -1,3 +1,4 @@
+import random
 import re
 import unittest
 from collections import defaultdict
@@ -50,7 +51,7 @@ class TestPreProcess(unittest.TestCase):
         rt_reg = re.compile('\x20?RT\x20?:?')
         hash_reg = re.compile('@[a-zA-Z0-9_]{2,}')
 
-        for i, tweet in enumerate(self.tweets):
+        for i, tweet in enumerate(random.sample(self.tweets, 10000)):
             new_tweet = self.client.clean_tweet(Item(tweet, '', '')).content
             assert not re.findall(rt_reg, new_tweet), 'RT was not successfully cleaned\n{}, {}'.format(i, tweet)
             assert not re.findall(at_reg, new_tweet), '@ was not successfully cleaned\n{}, {}'.format(i, tweet)
@@ -69,7 +70,7 @@ class TestPreProcess(unittest.TestCase):
 
     def test_clean_general(self):
         alls = [self.client.clean_reddit_comment(Item(i, '', '')) for i in self.comments] + \
-              [self.client.clean_tweet(Item(i, '', '')) for i in self.tweets] + \
+              [self.client.clean_tweet(Item(i, '', '')) for i in random.sample(self.tweets, 10000)] + \
               [self.client.clean_article(Item(i, '', '')) for i in self.htmls]
         for q in alls:
             i = self.client.clean_general(q)
