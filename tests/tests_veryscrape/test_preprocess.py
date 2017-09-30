@@ -21,7 +21,7 @@ def load_data(pth):
         for ln in f:
             comments.append(ln.strip('\n'))
     sep = '|S|P|E|C|I|A|L|S|E|P|'
-    with open(pth + '/htmls.txt') as f:
+    with open(pth + '/htmls.txt', encoding='utf-8', errors='replace') as f:
         data = f.read()
         htmls = data.split(sep)
     return tweets, comments, htmls

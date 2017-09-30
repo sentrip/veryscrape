@@ -82,7 +82,7 @@ def load_query_dictionary(file_name):
     """Loads query topics and corresponding queries from disk"""
     queries = {}
     with open(os.path.join(BASE_DIR, '%s.txt' % file_name), 'r') as f:
-        lns = f.read().splitlines()
+        lns = f.read().splitlines()[:5]
         for l in lns:
             x, y = l.split(':')
             queries[x] = y.split(',')

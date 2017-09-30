@@ -14,7 +14,7 @@ class TestTwingly(unittest.TestCase):
     topics = load_query_dictionary('query_topics')
     topic = next(iter(list(topics.keys())))
     q = 'tesla'
-    auth = f()[1][0]
+    auth = f()[0][0]
 
     @synchronous
     async def setUp(self):
