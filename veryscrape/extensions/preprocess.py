@@ -64,9 +64,10 @@ class PreProcessor(Process):
 
     @staticmethod
     def clean_reddit_comment(item):
-        """Replace subreddit paths and user paths with static tokens (/r/... - SUBREDDIT, /u/ MENTION) """
-        content = re.sub(r'<.*?>', '', item.content)
-        content = re.sub(r'[(\[deleted]|\[removed]|\[not found]]', '', content)
+        """Replace subreddit paths and user paths with static tokens (/r/... - SUBREDDIT) """
+        content = unescape(item.content)
+        content = re.sub(r'(\[deleted\])|(\[removed\])|(\[not found\])', '', content)
+        content = re.sub(r'/?r/[0-9a-zA-Z_]{3,}', '', content)
         return Item(content, item.topic, item.source)
 
     def clean_article(self, item):
@@ -80,13 +81,13 @@ class PreProcessor(Process):
             pass
         except Exception as e:
             print('PreProcess', repr(e))
-        return None
+        return Item('failed', '', '')
 
     @staticmethod
     def clean_general(item):
         """Remove any urls, non-ascii text and redundant spaces, normalize swearwords"""
         # Urls
-        content = re.sub(r'(http|ftp|https)(://)([\w_-]+(?:\.[\w_-]+)*)?([\d\w.,@?^=%&:/~+#-]*)?', '', item.content)
+        content = re.sub(r'(http|https):/?/?[\w_-]*(?:\.[\w_-]*)?[\d\w.,@?^=%&:/~+#-]*', '', item.content)
         # Ascii
         content = re.sub(r'([^\x20-\x7f]*)*([\t\n\r]*)*', '', content)
         # Swearwords
@@ -98,15 +99,13 @@ class PreProcessor(Process):
     def feature_convert(self, item, document_length=30, sentence_length=30):
         """Convert text of an item vector of shape [document_length * sentence_length] with word ids in the vector"""
         # Split sentences
-        sentences = sent_tokenize(item.content, language='english')
-        # Generator of lists of word ids
-        feature_generator = map(lambda x: [self.vocab[q] for q in self.bigram[x]], map(wordpunct_tokenize, sentences))
+        word_list_generator = map(wordpunct_tokenize, sent_tokenize(item.content, language='english'))
         # Initialize feature vector
         features = np.zeros([document_length, sentence_length], dtype=np.int32)
-        for i, sentence in enumerate(feature_generator):
+        for i, sentence in enumerate(self.bigram[word_list_generator]):
             for j, word in enumerate(sentence):
                 if i < document_length and j < sentence_length:
-                    features[i][j] = word
+                    features[i][j] = self.vocab[word]
         return Item(features, item.topic, item.source)
 
     def clean_item(self, item):
@@ -118,7 +117,7 @@ class PreProcessor(Process):
     def send_to_output(self, future):
         if not future.exception() and not future.cancelled():
             item = future.result()
-            if item is not None:
+            if item.content != 'failed' and item.topic and item.source:
                 self.output.put(item)
 
     def run(self):
