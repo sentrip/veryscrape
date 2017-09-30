@@ -1,9 +1,8 @@
 import os
 import re
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor
 from functools import partial
-from multiprocessing import Process
+from threading import Thread
 from xml.sax.saxutils import unescape
 
 import lxml.etree as etree
@@ -17,15 +16,14 @@ from nltk.tokenize import sent_tokenize, wordpunct_tokenize
 from veryscrape import Item, BASE_DIR
 
 
-class PreProcessor(Process):
-    def __init__(self, input_queue, output_queue, n_processes=2):
+class PreProcessor(Thread):
+    def __init__(self, input_queue, output_queue, pool):
         super(PreProcessor, self).__init__()
         self.input = input_queue
         self.output = output_queue
-        self.n_processes = n_processes
+        self.pool = pool
         self.vocab = None
         self.bigram = None
-        self.pool = None
         self.clean_functions = {'reddit': self.clean_reddit_comment, 'twitter': self.clean_tweet,
                                 'blog': self.clean_article, 'article': self.clean_article}
         # Html to article conversion with newspaper setup
@@ -123,9 +121,9 @@ class PreProcessor(Process):
     def run(self):
         self.vocab = self.load_vocab()
         self.bigram = self.load_ngram()
-        self.pool = ProcessPoolExecutor(self.n_processes)
 
         while True:
-            item = self.input.get()
-            future = self.pool.submit(self.clean_item, item)
-            future.add_done_callback(self.send_to_output)
+            if not self.input.empty():
+                item = self.input.get_nowait()
+                future = self.pool.submit(self.clean_item, item)
+                future.add_done_callback(self.send_to_output)

@@ -17,7 +17,10 @@ class TestBASE(unittest.TestCase):
 
     def test_queue_filter(self):
         filt = queue_filter(self.queue, interval=0.25)
+        start = time.time()
         d = next(filt)
+        diff = round(time.time() - start, 2)
+        assert diff == 0.25, 'Incorrect amount of time was taken, {}'.format(diff)
         assert len(d) == len(self.topics), 'Returned dictionary of incorrect length, {}'.format(len(d))
         assert set(list(d.keys()) + list(self.topics.keys())) == set(self.topics.keys()), 'Incorrect keys returned'
 

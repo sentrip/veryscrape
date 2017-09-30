@@ -2,6 +2,7 @@ import random
 import re
 import unittest
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Queue
 
 import numpy as np
@@ -29,7 +30,8 @@ def load_data(pth):
 class TestPreProcess(unittest.TestCase):
     input_queue = Queue()
     output_queue = Queue()
-    client = PreProcessor(input_queue, output_queue)
+    pool = ProcessPoolExecutor(1)
+    client = PreProcessor(input_queue, output_queue, pool)
     client.bigram = client.load_ngram()
     client.vocab = client.load_vocab()
     try:

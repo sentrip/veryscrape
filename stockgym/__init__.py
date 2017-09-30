@@ -35,7 +35,8 @@ class Distributor(Thread):
     def run(self):
         self.accept_incoming(self.n)
         while self.running:
-            data = self.queue.get()
-            new_data = self.normalize(data)
-            for c in self.connections:
-                c.send(new_data)
+            if not self.queue.empty():
+                data = self.queue.get_nowait()
+                new_data = self.normalize(data)
+                for c in self.connections:
+                    c.send(new_data)
