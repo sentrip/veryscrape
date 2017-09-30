@@ -3,7 +3,7 @@ import time
 
 from twingly_search.parser import Parser, TwinglySearchAuthenticationException
 
-from veryscrape import Item
+from veryscrape import Item, async_run_forever
 from veryscrape.client import SearchClient
 
 
@@ -45,3 +45,7 @@ class Twingly(SearchClient):
                 break
             else:
                 await asyncio.sleep(900)
+
+    @async_run_forever
+    async def stream(self, track=None, topic=None, duration=3600):
+        await self.blog_stream(track, topic, duration)

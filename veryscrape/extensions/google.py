@@ -3,7 +3,7 @@ import time
 
 import lxml.html as html
 
-from veryscrape import Item
+from veryscrape import Item, async_run_forever
 from veryscrape.client import SearchClient
 
 
@@ -38,3 +38,7 @@ class Google(SearchClient):
                 break
             else:
                 await asyncio.sleep(900)
+
+    @async_run_forever
+    async def stream(self, track=None, topic=None, duration=3600, use_proxy=False):
+        await self.article_stream(track, topic, duration, use_proxy)

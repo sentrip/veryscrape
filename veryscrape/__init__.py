@@ -2,7 +2,9 @@ import asyncio
 import json
 import os
 import re
+import sys
 import time
+import traceback
 from collections import namedtuple, defaultdict
 from functools import wraps, partial
 from random import SystemRandom
@@ -19,6 +21,7 @@ Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source,
 
 def retry_handler(ex, test=False):
     if not test:
+        traceback.print_exc(file=sys.stdout)
         print(repr(ex), 'retry')
 
 
