@@ -25,10 +25,9 @@ class StockGym(gym.Env):
         self._benchmark_returns = deque(maxlen=self.history_length)
         self.N = 50
         self.balance = 0.
-        self.last_agent_return, self.last_benchmark_return = 0., 0.
         for _ in range(3):
-            self._returns.append(self.last_agent_return)
-            self._benchmark_returns.append(self.last_benchmark_return)
+            self._returns.append(0.)
+            self._benchmark_returns.append(0.)
         # Buy/sell ratios
         self.ratios = [-1., 0.75, 0.5, 0.25, 0., 0.25, 0.5, 0.75, 1.]
         # (n_owned, price, red_sent, twit_sent, art_sent, blog_sent, long_SMA, lse_derivative, spline_est)
@@ -64,14 +63,13 @@ class StockGym(gym.Env):
 
         self.balance = self.initial_balance
         self.portfolio = np.array([0] * self.n_companies, dtype=np.int32)
-        self.initial_prices = self.history[-1][:, 4].flatten()
+        self.initial_prices = self.price_history[-1].flatten()
 
-        self.last_agent_return, self.last_benchmark_return = 0., 0.
         self._returns = deque(maxlen=self.history_length)
         self._benchmark_returns = deque(maxlen=self.history_length)
         for _ in range(3):
-            self._returns.append(self.last_agent_return)
-            self._benchmark_returns.append(self.last_benchmark_return)
+            self._returns.append(0.)
+            self._benchmark_returns.append(0.)
 
         return self.state
 
@@ -80,15 +78,14 @@ class StockGym(gym.Env):
         self.submit_order(action)
         # Observe
         self.update_history()
-        self.state = self.build_state()
 
         self._returns.append(self.agent_return)
-        self.last_agent_return = self.agent_return
         self._benchmark_returns.append(self.benchmark_return)
-        self.last_benchmark_return = self.benchmark_return
+
+        self.state = self.build_state()
 
         # Evaluate
-        reward = 1
+        reward = self.agent_market_ratio
         return self.state, reward, self.agent_is_broke, {}
 
     def build_state(self):
@@ -149,22 +146,22 @@ class StockGym(gym.Env):
     @property
     def market_value(self):
         """Average of inital_price/price ratios for all companies multiplied by initial investment"""
-        return self.initial_balance * np.sum(self.price_history[-1].flatten() / (self.initial_prices + 1e-7)) / self.n_companies
+        return self.initial_balance * np.mean(self.price_history[-1].flatten() / (self.initial_prices + 1e-7))
 
     @property
     def agent_market_ratio(self):
         """Scaling factor for agent's performence in comparison to the market"""
-        return self.agent_value / self.market_value
+        return min(self.agent_return / self.benchmark_return, 1000)
 
     @property
     def agent_return(self):
         """Current returns of agent from entire portfolio as excess percentage"""
-        return self.agent_value / self.initial_balance - self.last_agent_return - 1
+        return round(self.agent_value / self.initial_balance - self.returns[-1] - 1, 4) + 1e-9
 
     @property
     def benchmark_return(self):
         """Current returns of market as excess percentage"""
-        return self.market_value / self.initial_balance - self.last_benchmark_return - 1
+        return round(self.market_value / self.initial_balance - self.benchmark_returns[-1] - 1, 4) + 1e-9
 
     @property
     def alpha(self):

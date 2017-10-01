@@ -1,14 +1,14 @@
 import time
 from multiprocessing.connection import Listener
 from threading import Thread
-
+from multiprocessing import Queue
 import numpy as np
 
 
 class Sender:
     def __init__(self):
         self.conn = None
-        self.server = Listener(('localhost', 6200), authkey=b'veryscrape')
+        self.server = Listener(('localhost', 6100), authkey=b'veryscrape')
         Thread(target=self.connn).start()
         self.add = 3
         self.count = 0
@@ -34,11 +34,34 @@ class Sender:
         self.conn.send(mat)
 
 
+class Sender2:
+    def __init__(self, q):
+        self.q = q
+        self.add = 3
+        self.count = 0
+
+
+    def send(self):
+        mat = np.array([[0.5, 0.5, 0.5, 0.5, 150. + self.add]]*110)
+
+        if self.count > 10:
+            self.add -= 3
+        else:
+            self.add += 3
+
+        self.count += 1
+        self.q.put(mat)
+
 if __name__ == '__main__':
-    s = Sender()
+    from stockgym import Distributor
+    q = Queue()
+    s = Sender2(q)
+    d = Distributor(q, n_nodes=8)
+    d.start()
+    input()
     while True:
         s.send()
-        input()
+        #input()
 
     # import gym
     # import empyrical
