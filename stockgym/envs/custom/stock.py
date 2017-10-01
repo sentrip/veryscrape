@@ -244,11 +244,15 @@ class StockGym(gym.Env):
         self.bankrupt_threshold = 0.5
         self.history_length = 5000
         self.history = deque(maxlen=self.history_length)
-        self.portfolio = [0] * self.n_companies
+        self.portfolio = np.array([0] * self.n_companies, dtype=np.int32)
+        self.initial_prices = np.zeros([self.n_companies])
+        self.returns = deque(maxlen=self.history_length)
+        self.benchmark_returns = deque(maxlen=self.history_length)
         self.N = 50
-        self.balance = self.initial_balance
+        self.balance = 0
+        self.last_agent_return, self.last_benchmark_return = 0, 0
         # Buy/sell ratios
-        self.ratios = [-1., 0., 1.]
+        self.ratios = [-1., 0.75, 0.5, 0.25, 0., 0.25, 0.5, 0.75, 1.]
         # (n_owned, price, red_sent, twit_sent, art_sent, blog_sent, long_SMA, lse_derivative, spline_est)
         self.n_company_metrics = 5
         # (balance, agent_value, market_value, max_drawdown, alpha, beta, calmar, sharpe, sortino)
@@ -261,12 +265,9 @@ class StockGym(gym.Env):
         # +- infinity for all observations
         obs_space_size = np.array([np.finfo(np.float32).max] * action_space_size, dtype=np.float32)
         self.observation_space = spaces.Box(-obs_space_size, obs_space_size)
+        self._seed()
 
         self.incoming = Client(('localhost', 6200), authkey=b'veryscrape')
-
-        self.update_history()
-        self.state = self.build_state()
-        self._seed()
 
     def _render(self, mode='human', close=False):
         pass
@@ -276,6 +277,17 @@ class StockGym(gym.Env):
         return [seed]
 
     def _reset(self):
+        self.update_history()
+        self.state = self.build_state()
+
+        self.balance = self.initial_balance
+        self.portfolio = np.array([0] * self.n_companies, dtype=np.int32)
+        self.initial_prices = self.history[-1][:, 4].flatten()
+
+        self.last_agent_return, self.last_benchmark_return = 0, 0
+        self.returns = deque(maxlen=self.history_length)
+        self.benchmark_returns = deque(maxlen=self.history_length)
+
         return self.state
 
     def _step(self, action):
@@ -284,10 +296,15 @@ class StockGym(gym.Env):
         # Observe
         self.update_history()
         self.state = self.build_state()
+
+        self.returns.append(self.agent_return)
+        self.last_agent_return = self.agent_return
+        self.benchmark_returns.append(self.benchmark_return)
+        self.last_benchmark_return = self.benchmark_return
+
         # Evaluate
         reward = 1
-        done = False
-        return self.state, reward, done, {}
+        return self.state, reward, self.agent_is_broke, {}
 
     def build_state(self):
         portfolio_metrics = np.zeros([1, self.n_portfolio_metrics])
@@ -313,3 +330,36 @@ class StockGym(gym.Env):
         cost = current_price * n
         self.balance -= (cost + tc * abs(cost))
         self.portfolio[ind] += n
+
+
+    @property
+    def agent_value(self):
+        """Current value of all investments and money"""
+        ownership = self.state[self.n_portfolio_metrics + 4::self.n_company_metrics] * self.portfolio
+        return np.sum(ownership) * 0.999 + self.balance
+
+    @property
+    def agent_is_broke(self):
+        """Current value of all investments and money are less than a threshold percentage of the initial balance"""
+        return self.agent_value < self.initial_balance * self.bankrupt_threshold
+
+    @property
+    def market_value(self):
+        """Average of inital_price/price ratios for all companies multiplied by initial investment"""
+        return self.initial_balance * sum(self.history[-1][:, 4].flatten() / self.initial_prices) / self.n_companies
+
+    @property
+    def agent_market_ratio(self):
+        """Scaling factor for agent's performence in comparison to the market"""
+        return self.agent_value / self.market_value
+
+    @property
+    def agent_return(self):
+        """Current returns of agent from entire portfolio as excess percentage"""
+        return self.agent_value / self.initial_balance - self.last_agent_return - 1
+
+    @property
+    def benchmark_return(self):
+        """Current returns of market as excess percentage"""
+        return self.market_value / self.initial_balance - self.last_benchmark_return - 1
+
