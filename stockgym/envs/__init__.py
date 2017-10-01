@@ -513,6 +513,6 @@ register(
 
 register(
     id='StockGym-v0',
-    entry_point='gym.envs.custom:StockGym',
+    entry_point='gym.envs.custom.stock:StockGym',
 )
 

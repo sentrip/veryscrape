@@ -40,3 +40,4 @@ class Distributor(Thread):
                 new_data = self.normalize(data)
                 for c in self.connections:
                     c.send(new_data)
+
