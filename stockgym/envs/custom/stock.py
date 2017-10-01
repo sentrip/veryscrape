@@ -5,6 +5,7 @@ from functools import partial
 import empyrical
 
 import gym
+import bottleneck as bn
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
@@ -88,15 +89,18 @@ class StockGym(gym.Env):
         reward = self.agent_market_ratio
         return self.state, reward, self.agent_is_broke, {}
 
+    def _close(self):
+        self.incoming.close()
+
     def build_state(self):
         portfolio_metrics = np.array([
             self.balance, self.agent_value, self.market_value,
             self.alpha, self.beta, self.max_drawdown,
             self.downside_risk, self.sharpe_ratio, self.sortino_ratio]).reshape(-1, self.n_portfolio_metrics)
         calculated_metrics = self.history[-1]
-        for f in [self.sma, self.mma, self.lma, self.least_square_derivative]:
-            calculated_metrics = np.concatenate([calculated_metrics,
-                                                 np.apply_along_axis(f, 0, np.arange(0, self.n_companies)).reshape(-1, 1)], axis=1)
+        for i, f in enumerate([self.sma, self.mma, self.lma, self.least_square_derivative]):
+            new = np.apply_along_axis(f, 0, np.arange(0, self.n_companies)).reshape(-1, 1)
+            calculated_metrics = np.concatenate([calculated_metrics, new], axis=1)
         state = np.concatenate([portfolio_metrics, calculated_metrics], axis=0).flatten()
         return state
 
@@ -112,8 +116,8 @@ class StockGym(gym.Env):
         tc = 0.001
         current_price = self.history[-1][ind][4]
         if order > 0:
-            comission = int(self.balance * order / current_price) * current_price * tc
-            n = int((self.balance - comission) * order / current_price)
+            commission = int(self.balance * order / current_price) * current_price * tc
+            n = int((self.balance - commission) * order / current_price)
         else:
             n = int(self.portfolio[ind] * order)
         cost = current_price * n
@@ -130,7 +134,7 @@ class StockGym(gym.Env):
 
     @property
     def price_history(self):
-        return np.array(self.history)[:, :, 4]
+        return np.array(self.history)[:, :, 4].reshape(-1, self.n_companies)
 
     @property
     def agent_value(self):
@@ -146,7 +150,7 @@ class StockGym(gym.Env):
     @property
     def market_value(self):
         """Average of inital_price/price ratios for all companies multiplied by initial investment"""
-        return self.initial_balance * np.mean(self.price_history[-1].flatten() / (self.initial_prices + 1e-7))
+        return self.initial_balance * bn.nanmean(self.price_history[-1].flatten() / (self.initial_prices + 1e-7))
 
     @property
     def agent_market_ratio(self):
@@ -166,7 +170,7 @@ class StockGym(gym.Env):
     @property
     def alpha(self):
         """Current alpha value of portfolio"""
-        return np.sum(self.returns - self.beta * self.benchmark_returns)
+        return bn.nansum(self.returns - self.beta * self.benchmark_returns)
 
     @property
     def beta(self):
@@ -181,7 +185,7 @@ class StockGym(gym.Env):
         """Current downside risk of porfolio"""
         returns = self.returns.copy()
         returns[returns > 0] = 0
-        return np.sqrt(np.sum(np.square(returns)))
+        return np.sqrt(bn.nansum(np.square(returns)))
 
     @property
     def max_drawdown(self):
@@ -195,16 +199,16 @@ class StockGym(gym.Env):
     @property
     def sharpe_ratio(self):
         """Current risk-adjusted return ratio of portfolio"""
-        return np.mean(self.returns) / max(np.std(self.returns, ddof=1), 1e-7) * np.sqrt(self.returns.shape[0])
+        return bn.nanmean(self.returns) / max(bn.nanstd(self.returns, ddof=1), 1e-7) * np.sqrt(self.returns.shape[0])
 
     @property
     def sortino_ratio(self):
         """Current sortino ratio of portfolio"""
-        return np.sum(self.returns) / max(self.downside_risk, 1e-7)
+        return bn.nansum(self.returns) / max(self.downside_risk, 1e-7)
 
     def moving_average(self, factor, company_ind):
         """Simple moving average for previous factor*N stock prices"""
-        return np.sum(self.price_history[-self.N * factor:, company_ind], axis=0)
+        return bn.nansum(self.price_history[-self.N * factor:, company_ind], axis=0)
 
     def least_square_derivative(self, company_ind):
         """Derivative of linear least-squares estimates for previous N stock prices"""
