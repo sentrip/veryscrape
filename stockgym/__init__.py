@@ -7,7 +7,7 @@ import numpy as np
 from veryscrape import load_query_dictionary
 
 
-class Distributor(Process):
+class Distributor(Thread):
     def __init__(self, queue, n_nodes=50):
         super(Distributor, self).__init__()
         self.n = n_nodes
@@ -37,23 +37,23 @@ class Distributor(Process):
         self.accept_incoming(n=self.n)
         while self.running:
             if not self.queue.empty():
-                new_data = self.queue.get_nowait()
-                #new_data = self.normalize(data)
+                data = self.queue.get_nowait()
+                new_data = self.normalize(data)
                 for c in self.connections:
                     c.send(new_data)
 
-if __name__ == '__main__':
-    import gym
-    import numpy as np
-
-    def rn():
-        env = gym.make('StockGym-v0')
-        env.reset()
-        c=0
-        while True:
-            env.step(4)
-            if c % 1 == 0:
-                print(c)
-            c += 1
-    for _ in range(8):
-        Thread(target=rn).start()
+# if __name__ == '__main__':
+#     import gym
+#     import numpy as np
+#
+#     def rn():
+#         env = gym.make('StockGym-v0')
+#         env.reset()
+#         c=0
+#         while True:
+#             env.step(4)
+#             if c % 1 == 0:
+#                 print(c)
+#             c += 1
+#     for _ in range(8):
+#         Thread(target=rn).start()

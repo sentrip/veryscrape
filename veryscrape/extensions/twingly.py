@@ -35,8 +35,8 @@ class Twingly(SearchClient):
         start_time = time.time()
         while True:
             params = {'apiKey': self.client, 'q': self.build_query(track)}
-            resp = await self.get(self.blog_search_path, params=params)
-
+            async with await self.get(self.blog_search_path, params=params) as raw:
+                resp = await raw.text()
             urls = self.extract_urls(resp)
             for url in urls:
                 await self.queue.put(Item(url, topic, 'blog'))

@@ -1,5 +1,6 @@
 import asyncio
 from threading import Thread
+from multiprocessing import Process
 
 import veryscrape.extensions as vs
 from veryscrape import synchronous, get_auth, load_query_dictionary
@@ -74,6 +75,18 @@ from veryscrape import synchronous, get_auth, load_query_dictionary
 #         print('done!')
 
 
+class Runner(Thread):
+    def __init__(self, f):
+        super(Runner, self).__init__()
+        self.f = f
+
+    def run(self):
+        policy = asyncio.get_event_loop_policy()
+        policy.set_event_loop(policy.new_event_loop())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.f())
+
+
 class Producer:
     def __init__(self):
         self.topics = load_query_dictionary('query_topics')
@@ -85,23 +98,32 @@ class Producer:
         policy = asyncio.get_event_loop_policy()
         policy.set_event_loop(policy.new_event_loop())
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(job())
+        loop.run_until_complete(asyncio.gather(job))
 
-    @synchronous
     async def twingly(self):
         auth = await get_auth('twingly')
         client = vs.Twingly(auth[0][0], self.url_queue)
         jobs = []
+        args = []
         for topic, qs in self.topics.items():
             for q in qs:
-                jobs.append(client.stream(q, topic))
-        await asyncio.gather(*jobs)
+                args.append((q, topic))
+                jobs.append(asyncio.ensure_future(client.blog_stream(q, topic)))
+        while True:
+            for job in jobs:
+                if job.done():
+                    if job.exception():
+                        print(job.exception())
+                    i = jobs.index(job)
+                    job = asyncio.ensure_future(client.blog_stream(*args[i]))
+                    jobs[i] = job
+                await asyncio.sleep(0)
 
     async def main_loop(self):
-        Thread(target=self.run_in_loop, args=(self.twingly,)).start()
+        Runner(self.twingly).start()
 
         down = vs.Download(self.url_queue, self.result_queue)
-        Thread(target=self.run_in_loop, args=(down.stream,)).start()
+        Runner(down.stream).start()
 
         while True:
             item = await self.result_queue.get()

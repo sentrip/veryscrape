@@ -14,7 +14,7 @@ random = SystemRandom().random
 mock_response = namedtuple('Response', ['status', 'text'])
 
 
-class SearchClient:
+class SearchClient(aiohttp.ClientSession):
     base_url = 'http://google.com'
     # OAuth
     client, secret, token, token_secret = None, None, None, None
@@ -33,7 +33,7 @@ class SearchClient:
     user_agent = UserAgent().random
 
     def __init__(self):
-        self.session = aiohttp.ClientSession(headers={'user-agent': self.user_agent})
+        super(SearchClient, self).__init__()
 
     def update_rate_limit(self):
         now = time.time()
@@ -83,51 +83,43 @@ class SearchClient:
 
     @retry()
     async def update_oauth2_token(self):
-        future = await self.session.post(self.token_url, data={'grant_type': 'client_credentials'},
-                                         auth=aiohttp.BasicAuth(self.client, self.secret))
-        resp = await future.json()
-        self.token = resp['access_token']
-        try:
-            self.token_expiry = int(time.time()) + int(resp['expires_in'])
-        except KeyError:
-            self.token_expiry = 0
+        async with self.request('POST', self.token_url, data={'grant_type': 'client_credentials'},
+                                auth=aiohttp.BasicAuth(self.client, self.secret)) as resp:
+            auth = await resp.json()
+            self.token = auth['access_token']
+            try:
+                self.token_expiry = int(time.time()) + int(auth['expires_in'])
+            except KeyError:
+                self.token_expiry = 0
 
-    @retry()
-    async def request(self, method, url, params=None, return_json=False, stream=False,
-                      oauth=False, use_proxy=None, **aio_kwargs):
+    async def build_request(self, method, url, oauth, use_proxy, params, aio_kwargs):
         while self.rate_limit_exceeded:
             await self.update_rate_limit()
 
         if self.oauth2_token_expired:
             await self.update_oauth2_token()
 
-        url, params, aio_kwargs = await self.build_arguments(method, url, oauth, use_proxy, params, aio_kwargs)
-        resp = await self.session.request(method, url, params=params or {}, **aio_kwargs)
-        return resp if stream else (await resp.json() if return_json else await resp.text())
+        return await self.build_arguments(method, url, oauth, use_proxy, params, aio_kwargs)
 
-    async def get(self, url, **kwargs):
-        return await self.request('GET', url, **kwargs)
+    @retry()
+    async def get(self, url, *, allow_redirects=True, params=None, oauth=False, use_proxy=None, **kwargs):
+        url, params, aio_kwargs = await self.build_request('GET', url, oauth, use_proxy, params or {}, kwargs)
+        kwargs.update(aio_kwargs)
+        return aiohttp.client._RequestContextManager(self._request('GET', url, allow_redirects=allow_redirects,
+                                                                   params=params, **kwargs))
 
-    async def post(self, url, data=None, stream=False, **kwargs):
-        resp = await self.request('POST', url, data=data, **kwargs, stream=True)
-        if stream:
-            return resp
-        else:
-            result = await resp.text()
-            resp.close()
-            mock_resp = mock_response(resp.status, result)
-            return mock_resp
-
-    async def close(self):
-        await self.session.close()
+    @retry()
+    async def post(self, url, data, params=None, oauth=False, use_proxy=None, **kwargs):
+        url, params, aio_kwargs = await self.build_request('POST', url, oauth, use_proxy, params or {}, kwargs)
+        kwargs.update(aio_kwargs)
+        return aiohttp.client._RequestContextManager(self._request('POST', url, data=data, params=params, **kwargs))
 
     @retry()
     async def update_proxy(self, proxy_params=None):
         proxy_params = proxy_params or {}
         if self.proxy is None or self.failed:
-            resp = await self.session.get(self.proxy_url, params=proxy_params)
-            res = await resp.text()
-            resp.close()
+            async with await self.get(self.proxy_url, params=proxy_params) as resp:
+                res = await resp.text()
             if not res.startswith('Incorrect'):
                 self.proxy = res
             else:

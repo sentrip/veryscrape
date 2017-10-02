@@ -27,8 +27,9 @@ class Google(SearchClient):
     async def article_stream(self, track=None, topic=None, duration=10800, use_proxy=False):
         start_time = time.time()
         while True:
-            resp = await self.get(self.article_search_path.format(track, track),
-                                  use_proxy={'speed': 50, 'https': 1} if use_proxy else None)
+            async with await self.get(self.article_search_path.format(track, track),
+                                      use_proxy={'speed': 50, 'https': 1} if use_proxy else None) as raw:
+                resp = await raw.text()
 
             urls = self.extract_urls(resp)
             for url in urls:
