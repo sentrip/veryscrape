@@ -37,26 +37,24 @@ class TestSearchClient(unittest.TestCase):
         self.client.base_url = 'https://oauth.reddit.com/r/'
         self.client.token_url = 'https://www.reddit.com/api/v1/access_token'
         self.client.token_expiry = time.time() - 5
-        resp = await self.client.get('all/hot.json?raw_json=1', oauth=2, stream=True)
-        await resp.text()
-        assert self.client.token is not None, 'Token fetching was unsuccessful'
-        assert resp.status == 200, 'Request was not successfully executed'
+        async with await self.client.get('all/hot.json?raw_json=1', oauth=2) as resp:
+            assert self.client.token is not None, 'Token fetching was unsuccessful'
+            assert resp.status == 200, 'Request was not successfully executed'
 
     @synchronous
     async def test_request(self):
-        resp = await self.client.request('GET', self.test_server, stream=True)
-        assert resp.status == 200, 'Request to test server was unsuccessful'
+        async with self.client.request('GET', self.test_server) as resp:
+            assert resp.status == 200, 'Request to test server was unsuccessful'
 
     @synchronous
     async def test_get(self):
-        resp = await self.client.get(self.test_server, stream=True)
-        assert resp.status == 200, 'Request to test server was unsuccessful'
-        resp.close()
+        async with await self.client.get(self.test_server) as resp:
+            assert resp.status == 200, 'Request to test server was unsuccessful'
 
     @synchronous
     async def test_post(self):
-        resp = await self.client.post(self.test_server + 'post.php', data={'a': 1})
-        assert resp.status == 200, 'Request to test server was unsuccessful'
+        async with await self.client.post(self.test_server + 'post.php', data={'a': 1}) as resp:
+            assert resp.status == 200, 'Request to test server was unsuccessful'
 
     def test_instantiate_client(self):
         pass

@@ -29,14 +29,16 @@ class Reddit(SearchClient):
 
     async def get_links(self, track, **params):
         url = self.link_url.format(track, ('&' + urlencode(params)) if params else '')
-        resp = await self.get(url, oauth=2, return_json=True)
+        async with await self.get(url, oauth=2) as raw:
+            resp = await raw.json()
         self.last_id = resp['data']['after'] or ''
         links = {i['data']['id']: i['data']['created_utc'] for i in resp['data']['children']}
         return links
 
     async def get_comments(self, track, link, **params):
         url = self.comment_url.format(track, link, ('&' + urlencode(params)) if params else '')
-        resp = await self.get(url, oauth=2, return_json=True)
+        async with await self.get(url, oauth=2) as raw:
+            resp = await raw.json()
         comments = resp[1]['data']['children']
         return comments
 
@@ -45,7 +47,6 @@ class Reddit(SearchClient):
             if c['kind'] == 't1' and c['data']['id'] not in self.seen_comments:
                 self.seen_comments.add(c['data']['id'])
                 await self.queue.put(Item(c['data']['body'], topic, 'reddit'))
-                #await self.send_item(c['data']['body'], topic, 'reddit')
 
     async def comment_stream(self, track=None, topic=None, duration=10800):
         start_time = time.time()

@@ -17,13 +17,12 @@ class Download(SearchClient):
     async def download(self, item):
         # (aiohttp.Timeout, aiohttp.ClientError, ssl.CertificateError, KeyError, UnicodeDecodeError)
         with suppress(KeyError, UnicodeDecodeError):
-            resp = await self.get(item.content, stream=True)
-            enc_search = re.search('charset=(?P<enc>\S*)', resp.headers.get('content-type', default=''))
-            encoding = enc_search.group('enc') if enc_search else 'UTF-8'
-            html_text = await resp.text(encoding=encoding)
-            if resp.status == 200:
-                await self.result_queue.put(Item(html_text, item.topic, item.source))
-            resp.close()
+            async with await self.get(item.content) as resp:
+                enc_search = re.search('charset=(?P<enc>\S*)', resp.headers.get('content-type', default=''))
+                encoding = enc_search.group('enc') if enc_search else 'UTF-8'
+                html_text = await resp.text(encoding=encoding)
+                if resp.status == 200:
+                    await self.result_queue.put(Item(html_text, item.topic, item.source))
 
     async def stream(self, duration=0):
         start = time.time()

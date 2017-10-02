@@ -8,7 +8,7 @@ from multiprocessing import Queue
 import numpy as np
 
 from veryscrape import Item
-from veryscrape.extensions.preprocess import PreProcessor
+from veryscrape.preprocess import PreProcessor
 
 
 def load_data(pth):

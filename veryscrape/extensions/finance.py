@@ -27,8 +27,9 @@ class Finance(SearchClient):
         start_time = time.time()
         while True:
             repeat = time.time()
-            resp = await self.get(self.finance_search_path, params={'q': topic},
-                                  use_proxy={'speed': 50, 'https': 1} if use_proxy else None)
+            async with await self.get(self.finance_search_path, params={'q': topic},
+                                      use_proxy={'speed': 50, 'https': 1} if use_proxy else None) as raw:
+                resp = await raw.text()
 
             price = self.extract_stock(resp)
             await self.queue.put(Item(price, topic, 'stock'))
