@@ -2,8 +2,8 @@ import asyncio
 import json
 import os
 import re
-import sys
 import time
+import sys
 import traceback
 from collections import namedtuple, defaultdict
 from functools import wraps, partial
@@ -11,9 +11,13 @@ from random import SystemRandom
 
 import aiohttp
 
+from vs.client import SearchClient
+from vs.services.receiver import main_server
+
+
 random = SystemRandom().random
 
-linux_path, windows_path = "/home/djordje/veryscrape/veryscrape/documents", "C:/users/djordje/desktop/lib/documents"
+linux_path, windows_path = "/home/djordje/veryscrape/vs/documents", "C:/users/djordje/desktop/lib/documents"
 BASE_DIR = linux_path if os.path.isdir(linux_path) else windows_path
 Item = namedtuple('Item', ['content', 'topic', 'source'])
 Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
@@ -23,10 +27,6 @@ def retry_handler(ex, test=False):
     if not test:
         traceback.print_exc(file=sys.stdout)
         print(repr(ex), 'retry')
-
-
-def run_handler(ex):
-    print(repr(ex), 'run')
 
 
 def retry(n=5, wait_factor=2, initial_wait=1, test=False):
@@ -44,6 +44,10 @@ def retry(n=5, wait_factor=2, initial_wait=1, test=False):
             raise TimeoutError('Function `{}` exceeded maximum allowed number of retries'.format(fnc.__name__))
         return inner
     return wrapper
+
+
+def run_handler(ex):
+    print(repr(ex), 'run')
 
 
 def async_run_forever(fnc):

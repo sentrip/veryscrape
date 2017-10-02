@@ -3,8 +3,8 @@ import time
 
 import lxml.html as html
 
-from veryscrape import Item, async_run_forever
-from veryscrape.client import SearchClient
+from vs import Item, async_run_forever
+from vs import SearchClient
 
 
 class Google(SearchClient):

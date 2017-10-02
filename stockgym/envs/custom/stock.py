@@ -49,7 +49,7 @@ class StockGym(gym.Env):
         self.observation_space = spaces.Box(-obs_space_size, obs_space_size)
         self._seed()
 
-        self.incoming = Client(('localhost', 6200), authkey=b'veryscrape')
+        self.incoming = Client(('localhost', 6200), authkey=b'vs')
 
     def _render(self, mode='human', close=False):
         pass

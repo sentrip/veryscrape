@@ -51,7 +51,7 @@ class FinanceWorker(Process):
         return Item(content=stock_price, topic=query, source='stock')
 
     def run(self):
-        l = connection.Listener(('localhost', self.port), authkey=b'veryscrape')
+        l = connection.Listener(('localhost', self.port), authkey=b'vs')
         outgoing = l.accept()
         fua = UserAgent()
         pool = ThreadPoolExecutor(len(self.topics))

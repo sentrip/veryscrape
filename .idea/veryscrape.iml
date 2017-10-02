@@ -4,7 +4,7 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.idea" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.5.3 (C:\Users\Djordje\Anaconda3\envs\3.5\python.exe)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.5.2 virtualenv at ~/vsEnv" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TestRunnerService">

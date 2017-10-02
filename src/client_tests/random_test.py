@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     def print_stuff():
         from multiprocessing.connection import Client
-        c = Client(('localhost', port), authkey=b'veryscrape')
+        c = Client(('localhost', port), authkey=b'vs')
         while True:
             i = c.recv()
             print(i)

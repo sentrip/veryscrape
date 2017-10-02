@@ -4,7 +4,8 @@ import time
 import unittest
 from multiprocessing import Queue
 
-from veryscrape import Item, load_query_dictionary, queue_filter, synchronous, retry, get_auth
+from vs import Item, load_query_dictionary, queue_filter, synchronous, get_auth
+from vs.services import retry
 
 
 class TestBASE(unittest.TestCase):

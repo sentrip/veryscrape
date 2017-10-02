@@ -1,8 +1,7 @@
 import tkinter as tk
 from functools import partial
 from threading import Thread
-
-from veryscrape import load_query_dictionary
+from vs import load_query_dictionary
 
 RED, GREEN = '#ff8080', '#9fff80'
 
@@ -94,11 +93,9 @@ class Controller(tk.Tk):
         self.queue = queue
         self.frame = tk.Frame(self, width=600, height=600)
         self.frame.pack(fill='both', expand=True)
-        self.gui_button = tk.Button(self.frame, text='GUI', command=self.run_gui_threaded)
+        self.gui_button = tk.Button(self.frame, text='GUI', command=self.run_gui)
         self.gui_button.pack(side='top', fill='both', expand=True)
 
     def run_gui(self):
         GUI(self.queue).mainloop()
 
-    def run_gui_threaded(self):
-        Thread(target=self.run_gui).start()

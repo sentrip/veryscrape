@@ -5,8 +5,8 @@ import time
 
 import aiohttp
 
-from veryscrape import async_run_forever, Item
-from veryscrape.client import SearchClient
+from vs import SearchClient
+from vs import async_run_forever, Item
 
 
 class ReadBuffer:

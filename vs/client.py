@@ -8,7 +8,7 @@ import aioauth_client
 import aiohttp
 from fake_useragent import UserAgent
 
-from veryscrape import retry
+from vs.services import retry
 
 random = SystemRandom().random
 mock_response = namedtuple('Response', ['status', 'text'])

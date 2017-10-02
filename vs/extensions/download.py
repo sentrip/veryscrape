@@ -4,8 +4,8 @@ import re
 import time
 from contextlib import suppress
 
-from veryscrape import Item
-from veryscrape.client import SearchClient
+from vs import Item
+from vs import SearchClient
 
 
 class Download(SearchClient):

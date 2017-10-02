@@ -7,8 +7,8 @@ from multiprocessing import Queue
 
 import numpy as np
 
-from veryscrape import Item
-from veryscrape.preprocess import PreProcessor
+from vs import Item
+from vs.extensions.preprocess import PreProcessor
 
 
 def load_data(pth):
@@ -94,6 +94,7 @@ class TestPreProcess(unittest.TestCase):
         item = self.client.feature_convert(Item(sent, '', ''))
         assert item.content.shape == (30, 30), "Incorrect shape of features returned, {}".format(item.content.shape)
         assert np.sum(np.sum(item.content, axis=1)) > 0, 'No words were found'
+
 
 if __name__ == '__main__':
     unittest.main()

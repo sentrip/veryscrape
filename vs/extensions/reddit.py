@@ -3,8 +3,8 @@ import time
 from collections import defaultdict
 from urllib.parse import urlencode
 
-from veryscrape import async_run_forever, Item
-from veryscrape.client import SearchClient
+from vs import SearchClient
+from vs import async_run_forever, Item
 
 
 class Reddit(SearchClient):

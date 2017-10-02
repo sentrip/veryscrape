@@ -1,9 +1,8 @@
 import asyncio
 from threading import Thread
-from multiprocessing import Process
 
-import veryscrape.extensions as vs
-from veryscrape import synchronous, get_auth, load_query_dictionary
+import vs as vs
+from vs import get_auth, load_query_dictionary
 
 
 # class Producer:

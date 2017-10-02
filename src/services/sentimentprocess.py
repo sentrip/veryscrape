@@ -37,7 +37,7 @@ class SentimentWorker(Process):
 
     def run(self):
         batch_queue = Queue()
-        incoming = Client(('localhost', self.port), authkey=b'veryscrape')
+        incoming = Client(('localhost', self.port), authkey=b'vs')
         with tf.Session() as sess:
             items = []
             model = Model(BASE_DIR)
@@ -80,7 +80,7 @@ class SentimentAverage(Thread):
                 self.current_sentiments[q][t] = []
 
     def run(self):
-        outgoing = Listener(('localhost', self.port), authkey=b'veryscrape').accept()
+        outgoing = Listener(('localhost', self.port), authkey=b'vs').accept()
         start_time = item_timer = time.time()
         while True:
             item = self.queue.get()

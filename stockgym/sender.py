@@ -8,7 +8,7 @@ import numpy as np
 class Sender:
     def __init__(self):
         self.conn = None
-        self.server = Listener(('localhost', 6100), authkey=b'veryscrape')
+        self.server = Listener(('localhost', 6100), authkey=b'vs')
         Thread(target=self.connn).start()
         self.add = 3
         self.count = 0

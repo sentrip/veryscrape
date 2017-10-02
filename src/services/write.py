@@ -54,7 +54,7 @@ class WriteWorker(Process):
 
     def send_to_gym(self, gym_queue):
         """Consumes items from gym queue and sends complete dictionary of a single time snapshot to gym environment"""
-        outgoing = Listener(('localhost', self.gym_port), authkey=b'veryscrape').accept()
+        outgoing = Listener(('localhost', self.gym_port), authkey=b'vs').accept()
         while self.running:
             send_dictionary = defaultdict(partial(defaultdict, dict))
             while sum(len(i) for c, i in send_dictionary.items()) < len(self.topics) * len(self.subgroup_types):
@@ -64,11 +64,11 @@ class WriteWorker(Process):
                 outgoing.send(send_dictionary)
             except EOFError:
                 outgoing.close()
-                outgoing = Listener(('localhost', self.gym_port), authkey=b'veryscrape').accept()
+                outgoing = Listener(('localhost', self.gym_port), authkey=b'vs').accept()
 
     def run(self):
-        stock = Client(('localhost', self.stock_port), authkey=b'veryscrape')
-        sentiment = Client(('localhost', self.sentiment_port), authkey=b'veryscrape')
+        stock = Client(('localhost', self.stock_port), authkey=b'vs')
+        sentiment = Client(('localhost', self.sentiment_port), authkey=b'vs')
 
         if not os.path.isfile(self.file_name):
             with open(self.file_name, 'w') as f:

@@ -19,7 +19,7 @@ class TestDistributor(unittest.TestCase):
         cs = []
         try:
             for i in range(50):
-                c = Client(('localhost', 6200), authkey=b'veryscrape')
+                c = Client(('localhost', 6200), authkey=b'vs')
                 cs.append(c)
             time.sleep(0.01)
             d.running = False

@@ -4,7 +4,7 @@ from multiprocessing import Process
 
 import numpy as np
 
-from veryscrape import load_query_dictionary
+from vs import load_query_dictionary
 
 
 class Distributor(Thread):
@@ -13,7 +13,7 @@ class Distributor(Thread):
         self.n = n_nodes
         self.connections = []
         self.queue = queue
-        self.server = Listener(('localhost', 6200), authkey=b'veryscrape')
+        self.server = Listener(('localhost', 6200), authkey=b'vs')
         self.topics = sorted(list(load_query_dictionary('query_topics').keys()))
         self.types = ['article', 'blog', 'reddit', 'twitter', 'stock']
         self.running = True

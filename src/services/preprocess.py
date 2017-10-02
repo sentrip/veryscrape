@@ -93,8 +93,8 @@ class PreProcessWorker(Process):
         self.running = True
 
     def run(self):
-        incoming = Client(('localhost', self.incoming_port), authkey=b'veryscrape')
-        outgoing = Listener(('localhost', self.outgoing_port), authkey=b'veryscrape').accept()
+        incoming = Client(('localhost', self.incoming_port), authkey=b'vs')
+        outgoing = Listener(('localhost', self.outgoing_port), authkey=b'vs').accept()
 
         while self.running:
             item = incoming.recv()

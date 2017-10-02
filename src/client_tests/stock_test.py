@@ -11,7 +11,7 @@ from src.base import Producer
 def distribute(n):
     topics = Producer.load_query_dictionary('query_topics.txt')
     types = ['reddit', 'twitter', 'blog', 'article', 'stock']
-    server = Listener(('localhost', 6200), authkey=b'veryscrape')
+    server = Listener(('localhost', 6200), authkey=b'vs')
     connections = []
     for _ in range(n):
         connections.append(server.accept())

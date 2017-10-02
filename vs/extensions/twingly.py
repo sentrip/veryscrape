@@ -3,8 +3,8 @@ import time
 
 from twingly_search.parser import Parser, TwinglySearchAuthenticationException
 
-from veryscrape import Item, async_run_forever
-from veryscrape.client import SearchClient
+from vs import Item, async_run_forever
+from vs import SearchClient
 
 
 class Twingly(SearchClient):

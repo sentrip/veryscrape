@@ -56,7 +56,7 @@ class SentimentPage(tk.Frame):
 
 
 def distribute(queues):
-    incoming = Client(('localhost', 6100), authkey=b'veryscrape')
+    incoming = Client(('localhost', 6100), authkey=b'vs')
     while True:
         i = incoming.recv()
         for q in queues.values():

@@ -1,8 +1,8 @@
 import time
 import unittest
 
-from veryscrape import synchronous, get_auth
-from veryscrape.client import SearchClient
+from vs import SearchClient
+from vs import synchronous, get_auth
 
 
 class TestSearchClient(unittest.TestCase):

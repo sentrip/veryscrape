@@ -1,11 +1,12 @@
 import unittest
 import asyncio
-import json
-from collections import namedtuple
 from io import BytesIO
-from veryscrape import load_query_dictionary, synchronous, get_auth, Item
-from veryscrape.extensions import *
-from veryscrape.extensions.twitter import ReadBuffer
+from collections import namedtuple
+import json
+
+from vs.extensions import *
+from vs import load_query_dictionary, synchronous, get_auth, Item
+from vs.extensions.twitter import ReadBuffer
 
 
 class TestFinance(unittest.TestCase):

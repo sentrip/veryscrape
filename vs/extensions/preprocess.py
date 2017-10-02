@@ -13,7 +13,7 @@ from gensim.models.phrases import Phraser
 from newspaper import Config, extractors, cleaners, outputformatters
 from nltk.tokenize import sent_tokenize, wordpunct_tokenize
 
-from veryscrape import Item, BASE_DIR
+from vs import Item, BASE_DIR
 
 
 class PreProcessor(Thread):

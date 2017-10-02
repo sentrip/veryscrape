@@ -2,8 +2,8 @@ import asyncio
 import re
 import time
 
-from veryscrape import Item
-from veryscrape.client import SearchClient
+from vs import Item
+from vs import SearchClient
 
 
 class Finance(SearchClient):

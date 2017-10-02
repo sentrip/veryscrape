@@ -1,5 +1,8 @@
 import unittest
 import requests
+import json
+
+from vs import load_query_dictionary
 
 
 class TestProxy(unittest.TestCase):
@@ -41,8 +44,10 @@ class TestAPI(unittest.TestCase):
 class TestReceiver(unittest.TestCase):
 
     def test_correct_send(self):
+        correct = ['article', 'blog', 'reddit', 'twitter', 'stock']
+        d = {k: {c: 0.1 for c in load_query_dictionary('query_topics')} for k in correct}
         r = requests.post('http://192.168.1.53:9999',
-                          data={'content': 'Receiver test', 'topic': 'TEST', 'source': 'test'})
+                          data=json.dumps(d))
         assert r.status_code == 200, 'Request returned error!'
 
     def test_incorrect_send(self):

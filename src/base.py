@@ -91,7 +91,7 @@ class Producer(Process):
         loop.run_until_complete(asyncio.gather(*jobs))
 
     def run(self):
-        listener = Listener(('localhost', self.port), authkey=b'veryscrape')
+        listener = Listener(('localhost', self.port), authkey=b'vs')
         self.outgoing = listener.accept()
         jobs = self.initialize_work()
         for set_of_jobs in jobs:
