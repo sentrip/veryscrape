@@ -1,47 +1,41 @@
 import asyncio
-import re
-from collections import namedtuple
-from multiprocessing import Queue
+from threading import Thread
 
 import aiohttp
 import aiohttp.web as web
 
-Item = namedtuple('Item', ['content', 'topic', 'source'])
-Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
+from veryscrape.services.gui import Controller
 
 
 class MainServer(web.Server):
     def __init__(self, **kwargs):
         super(MainServer, self).__init__(self.process_request, **kwargs)
-        self.queue = Queue()
+        self.queue = asyncio.Queue()
+        self.expected_keys = ['article', 'blog', 'reddit', 'twitter', 'stock']
+        Thread(target=lambda: Controller(self.queue).mainloop()).start()
 
     async def process_request(self, request):
         try:
             if request.method != 'POST':
                 raise TypeError
-            data = await request.post()
-            self.queue.put(Item(**data))
+            data = await request.read()
+            dct = eval(data)
+            assert set(dct.keys()) == set(self.expected_keys)
+            await self.queue.put(dct)
             return web.Response(text='Success!', status=200)
 
-        except TypeError:
+        except (TypeError, AssertionError):
             return web.Response(text="Incorrectly formatted request", status=404)
 
 
 async def main_server(address):
     loop = asyncio.get_event_loop()
-
     session = aiohttp.ClientSession()
     server = MainServer()
     await loop.create_server(server, *address)
-    c = 1
     while True:
         try:
-            if not server.queue.empty():
-                _ = server.queue.get()
-                print(c, _)
-                c += 1
-            else:
-                await asyncio.sleep(0.1)
+            await asyncio.sleep(60)
         except KeyboardInterrupt:
             break
 

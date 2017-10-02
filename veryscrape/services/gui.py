@@ -1,8 +1,5 @@
-import random
-import time
 import tkinter as tk
 from functools import partial
-from multiprocessing import Queue
 from threading import Thread
 
 from veryscrape import load_query_dictionary
@@ -55,9 +52,9 @@ class StreamStatusPage(tk.Frame):
         self.update()
 
 
-class Main(tk.Tk):
+class GUI(tk.Tk):
     def __init__(self, queue, *args, **kwargs):
-        super(Main, self).__init__(*args, **kwargs)
+        super(GUI, self).__init__(*args, **kwargs)
         grid_size = (12, 10, 1, 1)
         self.queue = queue
         self.protocol("WM_DELETE_WINDOW", self.end)
@@ -91,25 +88,17 @@ class Main(tk.Tk):
                 self.status_frame.render(self.status_frame.current_view)
 
 
-if __name__ == '__main__':
-    def send():
-        ks = list(sorted(load_query_dictionary('query_topics').keys()))
-        starts = time.time()
-        while time.time() - starts < 3:
-            #input()
-            start = time.time()
-            d = {}
-            for t in ['article', 'blog', 'reddit', 'twitter', 'stock']:
-                d[t] = {}
-                for k in ks:
-                    if random.random() < 0.1:
-                        d[t][k] = 0.
-                    else:
-                        d[t][k] = random.random()
-            q.put(d)
-            time.sleep(1 - (time.time() - start))
+class Controller(tk.Tk):
+    def __init__(self, queue, *args, **kwargs):
+        super(Controller, self).__init__(*args, **kwargs)
+        self.queue = queue
+        self.frame = tk.Frame(self, width=600, height=600)
+        self.frame.pack(fill='both', expand=True)
+        self.gui_button = tk.Button(self.frame, text='GUI', command=self.run_gui_threaded)
+        self.gui_button.pack(side='top', fill='both', expand=True)
 
-    q = Queue()
-    root = Main(q)
-    Thread(target=send).start()
-    root.mainloop()
+    def run_gui(self):
+        GUI(self.queue).mainloop()
+
+    def run_gui_threaded(self):
+        Thread(target=self.run_gui).start()
