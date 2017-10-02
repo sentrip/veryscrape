@@ -1,52 +1,104 @@
 import tkinter as tk
+from functools import partial
+from threading import Thread
+import random
+from multiprocessing import Queue
 
 from veryscrape import load_query_dictionary
 
+RED, GREEN = '#ff8080', '#9fff80'
+
 
 class StreamStatusPage(tk.Frame):
-    def __init__(self, master, column_ind=None, source=None):
+    def __init__(self, master):
         super(StreamStatusPage, self).__init__(master)
-        self.labels = []
-        self.button = tk.Button(master, text=source or 'status', command=self.lift)
-        self.button.grid(row=0, column=column_ind * 2 or 0, sticky=tk.NSEW, columnspan=2, rowspan=1)
-        self.grid(row=1, column=0, sticky=tk.NSEW, columnspan=10, rowspan=11)
+        self.master = master
+        self.companies = list(sorted(load_query_dictionary('query_topics').keys()))
+        self.types = ['article', 'blog', 'reddit', 'twitter', 'stock']
+        self.current_view = 'article'
 
-        self.bad_color, self.good_color = '#ff8080', '#9fff80'
-        self.topics = list(sorted(load_query_dictionary('query_topics').keys()))
-        topics = iter(self.topics)
+        self.labels = {c: None for c in self.companies}
+        self.statuses = {c: {k: RED for k in self.types} for c in self.companies}
+
+        self.grid(row=1, column=0, sticky=tk.NSEW, columnspan=10, rowspan=11)
+        self.reset()
+        self.render('article')
+        self.lift()
+
+    def change_view(self, t):
+        self.current_view = t
+        self.render(t)
+
+    def reset(self):
+        for i, t in enumerate(self.types):
+            button = tk.Button(self.master, text=t, command=partial(self.change_view, t))
+            button.grid(row=0, column=i * 2, sticky=tk.NSEW, columnspan=2, rowspan=1)
+        topics = iter(self.companies)
         for i in range(11):
             self.rowconfigure(i, weight=1)
             for j in range(10):
                 self.columnconfigure(j, weight=1)
-                t = next(topics)
-                l = tk.Label(self, bd=2, bg=self.bad_color, text=t, relief='solid', font='Helvetica 14')
+                c = next(topics)
+                l = tk.Label(self, bd=2, bg=RED, text=c, relief='solid', font='Helvetica 14')
                 l.grid(row=i, column=j, sticky=tk.NSEW)
-                l.id = t
-                self.labels.append(l)
+                self.labels[c] = l
 
-    def change_label_color(self, color, ids):
-        for i, label in enumerate([j for j in self.labels if j.id in ids]):
-            self.labels[i].config(bg=color)
+    def update_colors(self, t, color_dict):
+        for k, c in color_dict.items():
+            self.statuses[k][t] = c
+
+    def render(self, t):
+        for c in self.companies:
+            self.labels[c].config(bg=self.statuses[c][t])
+            self.labels[c].update()
+        self.update()
 
 
 class Main(tk.Tk):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, queue, *args, **kwargs):
         super(Main, self).__init__(*args, **kwargs)
-        types = ['article', 'blog', 'reddit', 'twitter', 'stock']
-        self.frames = [StreamStatusPage(self, *pair) for pair in enumerate(types)]
-        self.grid(12, 10, 1, 1)
+        grid_size = (12, 10, 1, 1)
+        self.queue = queue
+        self.status_frame = StreamStatusPage(self)
+        self.grid(*grid_size)
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=11)
-        for i in range(len(self.frames) * 2):
+        for i in range(grid_size[1]):
             self.grid_columnconfigure(i, weight=1)
 
-if __name__ == '__main__':
+        Thread(target=self.pull).start()
 
-    root = Main()
-    # from threading import Thread
-    # ks = list(sorted(load_query_dictionary('query_topics').keys()))
-    # def send():
-    #     input()
-    #     root.frames[0].change_label_color(root.frames[0].good_color, ks)
-    # Thread(target=send).start()
+    def pull(self):
+        companies = list(sorted(load_query_dictionary('query_topics').keys()))
+        while True:
+            if not self.queue.empty():
+                data = self.queue.get_nowait()
+                for t, d in data.items():
+                    default = {c: RED for c in companies}
+                    for c, val in d.items():
+                        if val > 0:
+                            default[c] = GREEN
+                    self.status_frame.update_colors(t, default)
+                self.status_frame.render(self.status_frame.current_view)
+
+
+
+if __name__ == '__main__':
+    def send():
+        ks = list(sorted(load_query_dictionary('query_topics').keys()))
+        while True:
+            input()
+            d = {}
+            for t in ['article', 'blog', 'reddit', 'twitter', 'stock']:
+                d[t] = {}
+                for k in ks:
+                    if random.random() < 0.1:
+                        d[t][k] = 0.
+                    else:
+                        d[t][k] = random.random()
+            q.put(d)
+
+    q = Queue()
+    root = Main(q)
+    Thread(target=send).start()
     root.mainloop()
