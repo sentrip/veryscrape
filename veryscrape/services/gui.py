@@ -1,8 +1,9 @@
+import random
+import time
 import tkinter as tk
 from functools import partial
-from threading import Thread
-import random
 from multiprocessing import Queue
+from threading import Thread
 
 from veryscrape import load_query_dictionary
 
@@ -59,6 +60,7 @@ class Main(tk.Tk):
         super(Main, self).__init__(*args, **kwargs)
         grid_size = (12, 10, 1, 1)
         self.queue = queue
+        self.protocol("WM_DELETE_WINDOW", self.end)
         self.status_frame = StreamStatusPage(self)
         self.grid(*grid_size)
         self.grid_rowconfigure(0, weight=1)
@@ -66,11 +68,18 @@ class Main(tk.Tk):
         for i in range(grid_size[1]):
             self.grid_columnconfigure(i, weight=1)
 
-        Thread(target=self.pull).start()
+        self.running = True
+        self.puller = Thread(target=self.pull)
+        self.puller.start()
+
+    def end(self):
+        self.running = False
+        self.puller.join()
+        self.destroy()
 
     def pull(self):
         companies = list(sorted(load_query_dictionary('query_topics').keys()))
-        while True:
+        while self.running:
             if not self.queue.empty():
                 data = self.queue.get_nowait()
                 for t, d in data.items():
@@ -82,12 +91,13 @@ class Main(tk.Tk):
                 self.status_frame.render(self.status_frame.current_view)
 
 
-
 if __name__ == '__main__':
     def send():
         ks = list(sorted(load_query_dictionary('query_topics').keys()))
-        while True:
-            input()
+        starts = time.time()
+        while time.time() - starts < 3:
+            #input()
+            start = time.time()
             d = {}
             for t in ['article', 'blog', 'reddit', 'twitter', 'stock']:
                 d[t] = {}
@@ -97,6 +107,7 @@ if __name__ == '__main__':
                     else:
                         d[t][k] = random.random()
             q.put(d)
+            time.sleep(1 - (time.time() - start))
 
     q = Queue()
     root = Main(q)
