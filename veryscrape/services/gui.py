@@ -3,21 +3,25 @@ import tkinter as tk
 from veryscrape import load_query_dictionary
 
 
-class SentimentPage(tk.Frame):
-    def __init__(self, *args, source=None, **kwargs):
-        super(SentimentPage, self).__init__(*args, **kwargs)
+class StreamStatusPage(tk.Frame):
+    def __init__(self, master, column_ind=None, source=None):
+        super(StreamStatusPage, self).__init__(master)
         self.labels = []
-        self.source = source
+        self.button = tk.Button(master, text=source or 'status', command=self.lift)
+        self.button.grid(row=0, column=column_ind * 2 or 0, sticky=tk.NSEW, columnspan=2, rowspan=1)
+        self.grid(row=1, column=0, sticky=tk.NSEW, columnspan=10, rowspan=11)
+
         self.bad_color, self.good_color = '#ff8080', '#9fff80'
         self.topics = list(sorted(load_query_dictionary('query_topics').keys()))
         topics = iter(self.topics)
-        for j in range(11):
-            for i in range(10):
+        for i in range(11):
+            self.rowconfigure(i, weight=1)
+            for j in range(10):
+                self.columnconfigure(j, weight=1)
                 t = next(topics)
-                l = tk.Label(self, bd=2, bg=self.bad_color,# width=8, height=1,
-                             text=t, relief='solid', font='Helvetica 14')
+                l = tk.Label(self, bd=2, bg=self.bad_color, text=t, relief='solid', font='Helvetica 14')
+                l.grid(row=i, column=j, sticky=tk.NSEW)
                 l.id = t
-                l.grid(column=i, row=j, sticky=tk.N + tk.S + tk.E + tk.W)
                 self.labels.append(l)
 
     def change_label_color(self, color, ids):
@@ -28,29 +32,21 @@ class SentimentPage(tk.Frame):
 class Main(tk.Tk):
     def __init__(self, *args, **kwargs):
         super(Main, self).__init__(*args, **kwargs)
-        #self.container = tk.Frame(self)
-        self.grid()#baseWidth=11, baseHeight=13, widthInc=1, heightInc=1)
-        self.frames = []
-        self.subframes = []
-        page_names = ['article', 'blog', 'reddit', 'twitter', 'stock']
-        for i, t in enumerate(page_names):
-            #self.subframes.append([])
-            f = SentimentPage(self, source=t)#, self.subframes[i][0].lift())).\
-            tk.Button(self, text=t, command=lambda: (f.lift())).\
-                grid(row=0, column=i*2, columnspan=2, sticky=tk.N + tk.S + tk.E + tk.W)
-            f.grid(row=1, column=0, rowspan=11, columnspan=10, sticky=tk.N + tk.S + tk.E + tk.W)
-            self.frames.append(f)
-            #
-            # # Stream status subframe
-            # subframe1 = SentimentPage(f, source=t)
-            # tk.Button(f, text='Stream status', command=subframe1.lift).grid(sticky=tk.N + tk.S + tk.E + tk.W, row=0)
-            # subframe1.grid(sticky=tk.N + tk.S + tk.E + tk.W, row=1)
-            # self.subframes[i].append(subframe1)
-
-        self.frames[0].lift()
-        # self.subframes[0][0].lift()
-
+        types = ['article', 'blog', 'reddit', 'twitter', 'stock']
+        self.frames = [StreamStatusPage(self, *pair) for pair in enumerate(types)]
+        self.grid(12, 10, 1, 1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=11)
+        for i in range(len(self.frames) * 2):
+            self.grid_columnconfigure(i, weight=1)
 
 if __name__ == '__main__':
-    m = Main()
-    m.mainloop()
+
+    root = Main()
+    # from threading import Thread
+    # ks = list(sorted(load_query_dictionary('query_topics').keys()))
+    # def send():
+    #     input()
+    #     root.frames[0].change_label_color(root.frames[0].good_color, ks)
+    # Thread(target=send).start()
+    root.mainloop()
