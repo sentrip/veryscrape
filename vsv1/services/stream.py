@@ -1,9 +1,9 @@
 from multiprocessing import Queue
 
-from src.base import Producer
-from src.extensions.reddit import CommentStream
-from src.extensions.search import SearchStream, DownloadStream
-from src.extensions.twitter import TweetStream
+from vsv1.base import Producer
+from vsv1.extensions.reddit import CommentStream
+from vsv1.extensions.search import SearchStream, DownloadStream
+from vsv1.extensions.twitter import TweetStream
 
 
 class StreamWorker(Producer):

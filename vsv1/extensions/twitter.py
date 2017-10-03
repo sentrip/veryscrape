@@ -9,8 +9,8 @@ import aioauth_client
 import aiohttp
 from aiohttp.client_exceptions import ClientError, ServerDisconnectedError, ClientPayloadError, TimeoutError as Timeout
 
-from src.base import Item, AsyncStream
-from src.extensions.proxy import random_proxy
+from vsv1.base import Item, AsyncStream
+from vsv1.extensions.proxy import random_proxy
 
 random = SystemRandom().random
 

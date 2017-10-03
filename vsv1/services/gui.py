@@ -1,11 +1,10 @@
 import tkinter as tk
-import random
-from collections import defaultdict
-from multiprocessing import Queue, Process
-from multiprocessing.connection import Client, Listener
+from multiprocessing import Queue
+from multiprocessing.connection import Client
 from threading import Thread
-from src.base import Producer
-import time
+
+from vsv1.base import Producer
+
 # good - #9fff80
 # bad  - #ff8080
 STICKY_ALL = tk.N + tk.E + tk.S + tk.W

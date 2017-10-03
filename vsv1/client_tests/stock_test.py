@@ -5,7 +5,7 @@ from threading import Thread
 
 import gym
 
-from src.base import Producer
+from vsv1.base import Producer
 
 
 def distribute(n):

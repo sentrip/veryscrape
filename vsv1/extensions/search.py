@@ -2,8 +2,8 @@
 import asyncio
 import os
 import re
-import time
 import ssl
+import time
 from collections import deque
 from queue import Empty
 from urllib.parse import urlencode
@@ -13,8 +13,8 @@ from fake_useragent import UserAgent
 from lxml import html
 from twingly_search.parser import Parser
 
-from src.base import BASE_DIR, Item, AsyncStream, ExponentialBackOff
-from src.extensions.proxy import random_proxy
+from vsv1.base import BASE_DIR, Item, AsyncStream, ExponentialBackOff
+from vsv1.extensions.proxy import random_proxy
 
 
 class DownloadStream:

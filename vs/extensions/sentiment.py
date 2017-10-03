@@ -7,8 +7,8 @@ from threading import Thread
 import numpy as np
 import tensorflow as tf
 
-from src.base import BASE_DIR, Item, Producer
-from src.extensions.sentiment_model import Model
+from vsv1.base import BASE_DIR, Item, Producer
+from vsv1.extensions.sentiment_model import Model
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 

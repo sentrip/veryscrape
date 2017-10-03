@@ -10,18 +10,18 @@ port = 6000
 
 if __name__ == '__main__':
     if 't' in stages:
-        from src.services.stream import StreamWorker
+        from vsv1.services.stream import StreamWorker
         s = StreamWorker(use_processes=True)
         s.start()
         time.sleep(1)
     if 'p' in stages:
-        from src.services.preprocess import PreProcessWorker
+        from vsv1.services.preprocess import PreProcessWorker
         p = PreProcessWorker()
         p.start()
         port += 1
         time.sleep(1)
     if 's' in stages:
-        from src.services.sentimentprocess import SentimentAverage, SentimentWorker
+        from vsv1.services.sentimentprocess import SentimentAverage, SentimentWorker
         sent_queue = Queue()
         st = SentimentWorker(sent_queue)
         st.start()
@@ -30,13 +30,13 @@ if __name__ == '__main__':
         port += 1
         time.sleep(1)
     if 'f' in stages:
-        from src.services.finance import FinanceWorker
+        from vsv1.services.finance import FinanceWorker
         f = FinanceWorker(send_every=send_every)
         f.start()
         time.sleep(1)
         port = 6009
     if 'w' in stages:
-        from src.services.write import WriteWorker
+        from vsv1.services.write import WriteWorker
         w = WriteWorker(Lock(), send_every=send_every)
         w.start()
 

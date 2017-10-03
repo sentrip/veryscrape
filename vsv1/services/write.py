@@ -8,7 +8,7 @@ from multiprocessing import Queue, Process
 from multiprocessing.connection import Client, Listener
 from threading import Thread
 
-from src.base import BASE_DIR, Producer
+from vsv1.base import BASE_DIR, Producer
 
 
 class WriteWorker(Process):

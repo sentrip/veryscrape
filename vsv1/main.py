@@ -2,11 +2,11 @@ if __name__ == '__main__':
     import time
     from threading import Lock
     from multiprocessing import Queue
-    from src.services.finance import FinanceWorker
-    from src.services.preprocess import PreProcessWorker
-    from src.services.sentimentprocess import SentimentWorker, SentimentAverage
-    from src.services.stream import StreamWorker
-    from src.services.write import WriteWorker
+    from vsv1.services.finance import FinanceWorker
+    from vsv1.services.preprocess import PreProcessWorker
+    from vsv1.services.sentimentprocess import SentimentWorker, SentimentAverage
+    from vsv1.services.stream import StreamWorker
+    from vsv1.services.write import WriteWorker
     send_every = 60
     file_lock = Lock()
     sent_queue = Queue()

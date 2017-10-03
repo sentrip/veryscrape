@@ -6,14 +6,14 @@ from html import unescape
 from multiprocessing import Process
 from multiprocessing.connection import Listener, Client
 
+import lxml
 import numpy as np
 from gensim.models import Word2Vec
 from lxml import html
-import lxml
 from newspaper import Config, extractors, cleaners, outputformatters
 from nltk.tokenize import sent_tokenize, wordpunct_tokenize
 
-from src.base import BASE_DIR, Item
+from vsv1.base import BASE_DIR, Item
 
 
 def load_vocab(base_directory):

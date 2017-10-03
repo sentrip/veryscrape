@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 import aiohttp
 import requests
 
-from src.base import BASE_DIR, ExponentialBackOff
+from vsv1.base import BASE_DIR, ExponentialBackOff
 
 
 def get_key():

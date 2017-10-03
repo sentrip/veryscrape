@@ -7,8 +7,8 @@ from multiprocessing import Process, connection
 import requests
 from fake_useragent import UserAgent
 
-from src.base import Producer, Item
-from src.extensions.proxy import random_proxy_sync
+from vsv1.base import Producer, Item
+from vsv1.extensions.proxy import random_proxy_sync
 
 
 class FinanceWorker(Process):

@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 import aiohttp
 
-from src.base import Item, AsyncStream, ExponentialBackOff
+from vsv1.base import Item, AsyncStream, ExponentialBackOff
 
 
 class CommentStream(AsyncStream):
