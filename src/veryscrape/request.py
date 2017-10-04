@@ -36,6 +36,7 @@ async def fetch(url, session):
     except (aiohttp.ClientError, aiohttp.ServerDisconnectedError):
         return None
 
+
 async def download(url_queue, result_queue, duration=0):
     jobs = []
     start = time.time()
