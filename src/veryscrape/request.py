@@ -16,6 +16,7 @@ from retrying import retry
 random = SystemRandom().random
 Item = namedtuple('Item', ['content', 'topic', 'source'])
 
+
 async def get_auth(auth_type):
     """Requests api server for corresponding authentication information"""
     api_url = 'http://192.168.0.100:1111'

@@ -37,7 +37,7 @@ class InfiniteScraper:
         self.cls = cls(*args, **kwargs)
 
     @circuit_broken(n=5, reset=30)
-    async def scrape_forever(self, repeat_every, *args, **kwargs):
+    async def scrape_forever(self, *args, repeat_every=10, **kwargs):
         await self.cls.scrape(*args, **kwargs)
         await asyncio.sleep(repeat_every)
 
