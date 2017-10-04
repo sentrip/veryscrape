@@ -1,4 +1,5 @@
 import asyncio
+import random
 import re
 import time
 from functools import partial
@@ -7,6 +8,38 @@ import lxml.html as html
 from twingly_search.parser import Parser
 
 from veryscrape.request import RequestBuilder, ReadBuffer, Item
+
+
+def circuit_broken(n=5, reset=10, ex_handler=lambda ex: None):
+    def outer_wrapper(f):
+        async def inner_wrapper(*args, **kwargs):
+            offset = reset * random.random() * 0.2
+            last_fail = 0.
+            count = 0
+            while True:
+                await asyncio.sleep(0)
+                if count < n:
+                    try:
+                        await f(*args, **kwargs)
+                        count = 0
+                    except Exception as e:
+                        ex_handler(e)
+                        count += 1
+                        last_fail = time.time()
+                elif count >= n and time.time() - last_fail > reset + offset:
+                    count -= 1
+        return inner_wrapper
+    return outer_wrapper
+
+
+class InfiniteScraper:
+    def __init__(self, cls, *args, **kwargs):
+        self.cls = cls(*args, **kwargs)
+
+    @circuit_broken(n=5, reset=30)
+    async def scrape_forever(self, repeat_every, *args, **kwargs):
+        await self.cls.scrape(*args, **kwargs)
+        await asyncio.sleep(repeat_every)
 
 
 class Twitter(RequestBuilder):
