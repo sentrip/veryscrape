@@ -2,16 +2,19 @@ import asyncio
 import json
 import re
 import time
-from hashlib import sha1
+from collections import namedtuple
+from functools import partial
+from hashlib import sha1, md5
 from random import SystemRandom
 from urllib.parse import urljoin
 
 import aiohttp
 from aioauth_client import HmacSha1Signature
 from fake_useragent import UserAgent
+from retrying import retry
 
 random = SystemRandom().random
-
+Item = namedtuple('Item', ['content', 'topic', 'source'])
 
 async def get_auth(auth_type):
     """Requests api server for corresponding authentication information"""
@@ -25,15 +28,38 @@ async def get_auth(auth_type):
         return []
 
 
+@retry(stop_max_attempt_number=5, wait_exponential_multiplier=1000, wait_jitter_max=500)
+async def fetch(url, session):
+    try:
+        async with session.get(url) as raw:
+            return await raw.text()
+    except (aiohttp.ClientError, aiohttp.ServerDisconnectedError):
+        return None
+
+async def download(url_queue, result_queue, duration=0):
+    jobs = []
+    start = time.time()
+    sess = aiohttp.ClientSession()
+    while not duration or time.time() - start < duration or not url_queue.empty:
+        if len(jobs) >= 100 or url_queue.empty():
+            responses = await asyncio.gather(*jobs)
+            for resp in responses:
+                if resp is not None:
+                    new_item = Item(resp, item.topic, item.source)
+                    await result_queue.put(new_item)
+            jobs = []
+        item = await url_queue.get()
+        jobs.append(fetch(item.content, sess))
+    await sess.close()
+
+
 class RequestBuilder:
+    # Base request characteristics
     base_url = 'http://example.com'
     user_agent = None
     persist_user_agent = True
     # OAuth 1 & 2
-    client = None
-    secret = None
-    token = None
-    token_secret = None
+    client, secret, token, token_secret = None, None, None, None
     signature = HmacSha1Signature()
     # OAuth 2
     token_url = None
@@ -44,32 +70,42 @@ class RequestBuilder:
     last_removed = time.clock()
     # Proxy server
     proxy_url = 'http://192.168.0.100:9999'
-    proxy_params = None
-    proxy = None
+    proxy_params, proxy = None, None
+    # Unique item filtering
+    seen = set()
 
-    async def build_request_arguments(self, method, url, *, oauth=False, params=None, use_proxy=False, **aio_kwargs):
+    def setup(self, query):
+        """Overwrite with setup for scrape, return functools.partial of build_requests with appropriate arguments"""
+        return lambda: partial(asyncio.sleep, 1)
+
+    def handle_response(self, resp, topic, queue):
+        """Overwrite with response handling for scrape - response needs to be awaited (e.g. await resp.text())"""
+        pass
+
+    async def build_request(self, method, url, *, oauth=0, params=None, use_proxy=False, **aio_kwargs):
         """Waits for rate limit if defined, and updates request parameters with necessary oauth data"""
+        headers = {'user-agent': self._user_agent}
         while self.rate_limit_exceeded:
             self.update_rate_limit()
             await asyncio.sleep(0)
 
         if not url.startswith('http'):
-            urljoin(self.base_url, url)
+            url = urljoin(self.base_url, url)
 
         if oauth == 1:
             params.update(self.oauth1_parameters)
             params['oauth_signature'] = self.signature.sign(self.secret, method, url, self.token_secret, **params)
 
         elif oauth == 2:
-            if self.oauth2_token_expired:
-                aio_kwargs.update(await self.oauth2_parameters)
+            auth = await self.oauth2_parameters
+            headers.update(auth)
 
         if use_proxy:
             await self.update_proxy()
-            aio_kwargs.update(proxy=self.proxy)
+            aio_kwargs.update({'proxy': self.proxy})
 
-        aio_kwargs.update(headers={'user-agent': self._user_agent})
-        return url, params, aio_kwargs
+        aio_kwargs.update({'headers': headers})
+        return method, url, params, aio_kwargs
 
     def update_rate_limit(self):
         """Decrements request count by number of allowed requests since last update"""
@@ -133,6 +169,36 @@ class RequestBuilder:
             if not res.startswith('Incorrect'):
                 self.proxy = res
 
+    @staticmethod
+    def clean_urls(urls):
+        """Generator for removing useless or uninteresting urls from an iterable of urls"""
+        bad_domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
+        false_urls = {'google.', 'blogger.', 'youtube.', 'googlenewsblog.'}
+        for u in urls:
+            is_root_url = any(u.endswith(j) for j in bad_domains)
+            is_not_relevant = any(j in u for j in false_urls)
+            if u.startswith('http') and not (is_root_url or is_not_relevant):
+                yield u
+
+    def filter(self, item):
+        """Returns False if the item has been seen before, True if not"""
+        hsh = md5(item.encode()).hexdigest()
+        if hsh not in self.seen:
+            self.seen.add(hsh)
+            if len(self.seen) >= 50000:
+                self.seen.pop()
+            return True
+        return False
+
+    @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_jitter_max=500)
+    async def scrape(self, query, topic, queue):
+        """Scrapes resources provided in setup method and handles response with handle_response method"""
+        setup = self.setup(query)
+        method, url, params, kwargs = await setup()
+        async with aiohttp.ClientSession() as sess:
+            async with sess.request(method, url, params=params, **kwargs) as raw:
+                await self.handle_response(raw, topic, queue)
+
 
 class ReadBuffer:
     """Asynchronous stream data read buffer"""
@@ -150,7 +216,7 @@ class ReadBuffer:
         """Yields next chunk of stream as a byte string"""
         chunk = b''
         try:
-            chunk = await self.raw.read(self.chunk_size)
+            chunk = await self.raw.content.read(self.chunk_size)
             self.buffer += chunk
         except (aiohttp.Timeout, aiohttp.ClientPayloadError):
             self.raw.close()

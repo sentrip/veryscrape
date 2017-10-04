@@ -19,6 +19,18 @@ class TestRequestBasicFunctions(unittest.TestCase):
             assert isinstance(auth, list), 'Incorrect auth data type returned!, {}'.format(type(auth))
             assert len(auth) >= 1, 'No authentications returned, {}'.format(auth)
 
+    @synchronous
+    async def test_fetch(self):
+        """Tests the simple http fetch method"""
+        # todo implement test
+        pass
+
+    @synchronous
+    async def test_download(self):
+        """Tests continuous download coroutine to ensure urls are being downloaded"""
+        # todo implement test
+        pass
+
 
 class TestRequestBuilder(unittest.TestCase):
 
@@ -98,20 +110,38 @@ class TestRequestBuilder(unittest.TestCase):
         assert headers == {'Authorization': 'bearer ' + self.builder.token}, \
             'Incorrect headers returned'
 
+    @synchronous
+    async def test_clean_urls(self):
+        """Tests whether the url sanitizing generator correctly removes bad urls"""
+        # todo implement test
+        pass
+
+    @synchronous
+    async def test_filter(self):
+        """Tests whether the unique filter is correcly able to remove all duplicates"""
+        # todo implement test
+        pass
+
+    @synchronous
+    async def test_scrape(self):
+        """Tests whether the scrape function correctly handles an http request and response"""
+        # todo implement test
+        pass
+
 
 class TestReadBuffer(unittest.TestCase):
     @synchronous
-    async def test_read_buffer_small_stream(self):
-        tweets = [{'status': 'This tweet'}, {'status': 'This tweet'}]
-        mock_stream_content = bytes('{}\r\n\r{}\r\n'.format(*list(map(json.dumps, tweets))), encoding='utf-8')
-        mock_stream = BytesIO(mock_stream_content)
-        mock_stream.headers = {}
+    async def test_read_buffer_no_data_in_stream(self):
+        ms = namedtuple('MockStream', ['content', 'headers'])
+        mock_stream = ms(BytesIO(bytes('', encoding='utf-8')), {})
         buf = ReadBuffer(mock_stream)
-        async for item in buf:
-            assert item == 'This item', 'Did not return same item!'
+        c = 0
+        async for _ in buf:
+            c += 1
+        assert c == 0, "Items were yielded from an empty buffer!"
 
     @synchronous
-    async def test_read_buffer_large_stream(self):
+    async def test_read_buffer_data_in_stream(self):
         tweets = [{'status': 'This tweet'}] * 10000
         ms = namedtuple('MockStream', ['content', 'headers'])
         s = '\r\n\r'.join(['{}']*10000) + '\r\n'
