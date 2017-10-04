@@ -2,8 +2,8 @@ import asyncio
 import json
 import os
 import re
-import time
 import sys
+import time
 import traceback
 from collections import namedtuple, defaultdict
 from functools import wraps, partial
@@ -13,7 +13,6 @@ import aiohttp
 
 from vs.client import SearchClient
 from vs.services.receiver import main_server
-
 
 random = SystemRandom().random
 
@@ -86,7 +85,7 @@ def load_query_dictionary(file_name):
     """Loads query topics and corresponding queries from disk"""
     queries = {}
     with open(os.path.join(BASE_DIR, '%s.txt' % file_name), 'r') as f:
-        lns = f.read().splitlines()
+        lns = f.read().splitlines()[10:13]
         for l in lns:
             x, y = l.split(':')
             queries[x] = y.split(',')

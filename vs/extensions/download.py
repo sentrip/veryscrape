@@ -4,6 +4,8 @@ import re
 import time
 from contextlib import suppress
 
+import aiohttp
+
 from vs import Item
 from vs import SearchClient
 
@@ -32,3 +34,24 @@ class Download(SearchClient):
                 asyncio.ensure_future(self.download(url))
             except asyncio.queues.QueueEmpty:
                 await asyncio.sleep(0.1)
+
+
+async def dl(item, sess):
+    async with sess.get(item.content) as resp:
+        res = await resp.text()
+    return Item(res, item.topic, item.source)
+
+
+async def down(url_queue, result_queue, duration=0):
+    session = aiohttp.ClientSession()
+    start = time.time()
+    jobs = []
+    while not duration or time.time() - start < duration or not url_queue.empty():
+        item = await url_queue.get()
+        jobs.append(dl(item, session))
+        if len(jobs) > 100 or url_queue.empty():
+            new = await asyncio.gather(*jobs)
+            for i in new:
+                await result_queue.put(i)
+            jobs = []
+    await session.close()

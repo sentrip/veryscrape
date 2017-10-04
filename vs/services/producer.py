@@ -1,8 +1,58 @@
 import asyncio
-from threading import Thread
+from multiprocessing import Queue
 
-import vs as vs
 from vs import get_auth, load_query_dictionary
+from vs.extensions import *
+# class Producer:
+#     def __init__(self):
+#         self.topics = load_query_dictionary('query_topics')
+#         self.url_queue = asyncio.Queue()
+#         self.result_queue = asyncio.Queue()
+#
+#     @staticmethod
+#     def run_in_loop(job):
+#         policy = asyncio.get_event_loop_policy()
+#         policy.set_event_loop(policy.new_event_loop())
+#         loop = asyncio.get_event_loop()
+#         loop.run_until_complete(asyncio.gather(job))
+#
+#     async def twingly(self):
+#         auth = await get_auth('twingly')
+#         client = vs.Twingly(auth[0][0], self.url_queue)
+#         jobs = []
+#         args = []
+#         for topic, qs in self.topics.items():
+#             for q in qs:
+#                 args.append((q, topic))
+#                 jobs.append(asyncio.ensure_future(client.blog_stream(q, topic)))
+#         while True:
+#             for job in jobs:
+#                 if job.done():
+#                     if job.exception():
+#                         print(job.exception())
+#                     i = jobs.index(job)
+#                     job = asyncio.ensure_future(client.blog_stream(*args[i]))
+#                     jobs[i] = job
+#                 await asyncio.sleep(0)
+#
+#     async def main_loop(self):
+#         Runner(self.twingly).start()
+#
+#         down = vs.Download(self.url_queue, self.result_queue)
+#         Runner(down.stream).start()
+#
+#         while True:
+#             item = await self.result_queue.get()
+#             print(item)
+#
+#     def run(self):
+#         loop = asyncio.get_event_loop()
+#         loop.run_until_complete(self.main_loop())
+#
+# if __name__ == '__main__':
+#     producer = Producer()
+#     producer.run()
+from vs.extensions.download import down
 
 
 # class Producer:
@@ -72,18 +122,16 @@ from vs import get_auth, load_query_dictionary
 #             except KeyboardInterrupt:
 #                 break
 #         print('done!')
-
-
-class Runner(Thread):
-    def __init__(self, f):
-        super(Runner, self).__init__()
-        self.f = f
-
-    def run(self):
-        policy = asyncio.get_event_loop_policy()
-        policy.set_event_loop(policy.new_event_loop())
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.f())
+# class Runner(Thread):
+#     def __init__(self, f):
+#         super(Runner, self).__init__()
+#         self.f = f
+#
+#     def run(self):
+#         policy = asyncio.get_event_loop_policy()
+#         policy.set_event_loop(policy.new_event_loop())
+#         loop = asyncio.get_event_loop()
+#         loop.run_until_complete(self.f())
 
 
 class Producer:
@@ -91,48 +139,28 @@ class Producer:
         self.topics = load_query_dictionary('query_topics')
         self.url_queue = asyncio.Queue()
         self.result_queue = asyncio.Queue()
+        self.preprocess_queue = Queue()
+        # self.sentiment_queue = Queue()
+        self.output_queue = asyncio.Queue()
 
-    @staticmethod
-    def run_in_loop(job):
-        policy = asyncio.get_event_loop_policy()
-        policy.set_event_loop(policy.new_event_loop())
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.gather(job))
-
-    async def twingly(self):
-        auth = await get_auth('twingly')
-        client = vs.Twingly(auth[0][0], self.url_queue)
-        jobs = []
-        args = []
-        for topic, qs in self.topics.items():
-            for q in qs:
-                args.append((q, topic))
-                jobs.append(asyncio.ensure_future(client.blog_stream(q, topic)))
-        while True:
-            for job in jobs:
-                if job.done():
-                    if job.exception():
-                        print(job.exception())
-                    i = jobs.index(job)
-                    job = asyncio.ensure_future(client.blog_stream(*args[i]))
-                    jobs[i] = job
-                await asyncio.sleep(0)
-
-    async def main_loop(self):
-        Runner(self.twingly).start()
-
-        down = vs.Download(self.url_queue, self.result_queue)
-        Runner(down.stream).start()
-
+    async def prnt(self):
         while True:
             item = await self.result_queue.get()
             print(item)
 
-    def run(self):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.main_loop())
+    async def run(self):
+        auth = await get_auth('twingly')
+        tw = Twingly(auth[0][0], self.url_queue)
+        jobs = [down(self.url_queue, self.result_queue)]
+        for t in self.topics:
+            for q in self.topics[t]:
+                jobs.append(tw.blog_stream(q, t, 1))
+        jobs.append(self.prnt())
+        await asyncio.gather(*jobs)
+        tw.close()
+
 
 if __name__ == '__main__':
     producer = Producer()
-    producer.run()
-
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(producer.run())
