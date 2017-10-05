@@ -18,6 +18,7 @@ Item = namedtuple('Item', ['content', 'topic', 'source'])
 Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
 
 
+
 async def get_auth(auth_type):
     """Requests api server for corresponding authentication information"""
     api_url = 'http://192.168.0.100:1111'
