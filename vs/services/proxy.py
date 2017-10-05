@@ -29,7 +29,7 @@ class Proxy:
         self.ip = params.get('ip', None)
         self.port = params.get('port', None)
         self.protocol = params.get('protocol', None)
-        self.speed = float(params.get('downloadSpeed', '0.1'))
+        self.speed = float(params.get('downloadSpeed', 0.1))
         # Proxy capability
         self.https = params.get('allowsHttps', False)
         self.post = params.get('allowsPost', False)
@@ -80,13 +80,17 @@ class ProxyServer(web.Server):
 
     def on_data(self, params):
         for proxy, index in reversed(list(zip(self.proxies, range(len(self.proxies))))):
-            good = not params
-            if not good:
-                for k in params:
-                    if k == 'speed':
-                        good = good or proxy.speed >= float(params[k])
-                    else:
-                        good = good or proxy not in self.used_proxies
+            good = True
+            if params:
+                try:
+                    s = float(params['speed'])
+                    if proxy.speed <= s:
+                        good = False
+                except KeyError:
+                    pass
+                for k in params.keys():
+                    if k != 'speed' and not proxy.__dict__[k]:
+                        good = False
             if good:
                 if proxy in self.fast_proxies:
                     self.fast_proxies.remove(proxy)

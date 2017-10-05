@@ -10,7 +10,7 @@ from twingly_search.parser import Parser
 from veryscrape.request import RequestBuilder, ReadBuffer, Item
 
 
-def circuit_broken(n=5, reset=10, ex_handler=lambda ex: None):
+def circuit_broken(n=5, reset=10, ex_handler=lambda ex: print(repr(ex))):
     def outer_wrapper(f):
         async def inner_wrapper(*args, **kwargs):
             offset = reset * random.random() * 0.2
@@ -37,14 +37,16 @@ class InfiniteScraper:
         self.cls = cls(*args, **kwargs)
 
     @circuit_broken(n=5, reset=30)
-    async def scrape_forever(self, repeat_every, *args, **kwargs):
+    async def scrape_forever(self, start_delay, repeat_every, *args, **kwargs):
+        start = time.time()
+        await asyncio.sleep(start_delay)
         await self.cls.scrape(*args, **kwargs)
-        await asyncio.sleep(repeat_every)
+        await asyncio.sleep(max(0, repeat_every - (time.time() - start)))
 
 
 class Twitter(RequestBuilder):
     base_url = 'https://stream.twitter.com/1.1/'
-    proxy_params = {'speed': 100, 'https': 1, 'post': 1}
+    proxy_params = {'speed': 30, 'https': 1, 'post': 1}
     # Rate limits
     retry_420 = 60
     snooze_time = 0.25
@@ -99,7 +101,11 @@ class Reddit(RequestBuilder):
             raise ConnectionError('Could not connect to reddit')
         else:
             res = await resp.json()
-        comments = res[1]['data']['children']
+        comments = []
+        try:
+            assert isinstance(res, dict)
+        except AssertionError:
+            comments = res[1]['data']['children']
         for c in comments:
             if c['kind'] == 't1' and self.filter(c['data']['body']):
                 item = Item(c['data']['body'], topic, 'reddit')
@@ -109,7 +115,7 @@ class Reddit(RequestBuilder):
         resp = await resp.json()
         for i in resp['data']['children']:
             link = i['data']['id']
-            await self.scrape(self.setup_comments(link), self.handle_comments, topic, queue)
+            await self.scrape(link, topic, queue, setup=self.setup_comments, resp_handler=self.handle_comments)
 
 
 class Twingly(RequestBuilder):

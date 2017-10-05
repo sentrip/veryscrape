@@ -15,6 +15,8 @@ from retrying import retry
 
 random = SystemRandom().random
 Item = namedtuple('Item', ['content', 'topic', 'source'])
+Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
+
 
 async def get_auth(auth_type):
     """Requests api server for corresponding authentication information"""
@@ -32,7 +34,9 @@ async def get_auth(auth_type):
 async def fetch(url, session):
     try:
         async with session.get(url) as raw:
-            return await raw.text()
+            enc_search = re.search('charset=(?P<enc>\S*)', raw.headers.get('content-type', default=''))
+            encoding = enc_search.group('enc') if enc_search else 'UTF-8'
+            return await raw.text(encoding=encoding, errors='ignore')
     except (aiohttp.ClientError, aiohttp.ServerDisconnectedError):
         return None
 
@@ -192,13 +196,18 @@ class RequestBuilder:
         return False
 
     @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_jitter_max=500)
-    async def scrape(self, query, topic, queue):
+    async def scrape(self, query, topic, queue, use_proxy=False, setup=None, resp_handler=None):
         """Scrapes resources provided in setup method and handles response with handle_response method"""
-        setup = self.setup(query)
+        if setup is None:
+            setup = self.setup
+        if resp_handler is None:
+            resp_handler = self.handle_response
+        args = [query] + ([use_proxy] if use_proxy else [])
+        setup = setup(*args)
         method, url, params, kwargs = await setup()
         async with aiohttp.ClientSession() as sess:
             async with sess.request(method, url, params=params, **kwargs) as raw:
-                await self.handle_response(raw, topic, queue)
+                await resp_handler(raw, topic, queue)
 
 
 class ReadBuffer:
