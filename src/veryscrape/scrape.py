@@ -1,13 +1,24 @@
 import asyncio
 import random
 import re
+import ssl
 import time
 from functools import partial
 
+import aiohttp
 import lxml.html as html
 from twingly_search.parser import Parser
 
 from veryscrape.request import RequestBuilder, ReadBuffer, Item
+
+
+def scrape_handler(ex):
+    allowed = [ConnectionError, aiohttp.ClientError, aiohttp.ServerDisconnectedError, ssl.CertificateError]
+    for a_ex in allowed:
+        if isinstance(ex, a_ex):
+            return
+    else:
+        print(repr(ex))
 
 
 def circuit_broken(n=5, reset=10, ex_handler=lambda ex: print(repr(ex))):
@@ -36,7 +47,7 @@ class InfiniteScraper:
     def __init__(self, cls, *args, **kwargs):
         self.cls = cls(*args, **kwargs)
 
-    @circuit_broken(n=5, reset=30)
+    @circuit_broken(n=5, reset=30, ex_handler=scrape_handler)
     async def scrape_forever(self, start_delay, repeat_every, *args, **kwargs):
         start = time.time()
         await asyncio.sleep(start_delay)

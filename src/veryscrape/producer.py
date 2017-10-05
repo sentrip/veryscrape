@@ -1,10 +1,11 @@
 import json
 import os
 from collections import defaultdict
-from multiprocessing import Queue, Process
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import Queue
+from threading import Thread
 
-import aiohttp
-
+from veryscrape.preprocess import PreProcessor
 from veryscrape.request import download, get_auth
 from veryscrape.scrape import *
 
@@ -23,20 +24,28 @@ def load_query_dictionary(file_name):
     return queries
 
 
-def queue_filter(queue, interval=60):
-    data = defaultdict(partial(defaultdict, list))
-    start = time.time()
-    while True:
-        if not queue.empty():
-            item = queue.get_nowait()
-            data[item.source][item.topic].append(item.content)
-        if time.time() - start >= interval:
-            start = time.time()
-            averages = {t: {k: sum(s) / max(1, len(s)) for k, s in qs.items()} for t, qs in data.items()}
-            yield averages
-            for t, qs in data.items():
-                for k in qs:
-                    data[t][k] = []
+class QueueFilter:
+    def __init__(self, queue, interval=60):
+        self.queue = queue
+        self.interval = interval
+        self.data = defaultdict(partial(defaultdict, list))
+        self.start = time.time()
+
+    async def __anext__(self):
+        while time.time() - self.start <= self.interval:
+            if not self.queue.empty():
+                item = self.queue.get_nowait()
+                self.data[item.source][item.topic].append(item.content)
+            await asyncio.sleep(0)
+        self.start = time.time()
+        averages = {t: {k: sum(s) / max(1, len(s)) for k, s in qs.items()} for t, qs in self.data.items()}
+        for t, qs in self.data.items():
+            for k in qs:
+                self.data[t][k] = []
+        return averages
+
+    def __aiter__(self):
+        return self
 
 
 class Producer:
@@ -56,11 +65,6 @@ class Producer:
                 item = self.sentiment_queue.get_nowait()
                 await self.output_queue.put(item)
             await asyncio.sleep(0)
-
-    async def prnt(self):
-        while True:
-            item = await self.result_queue.get()
-            print(item)
 
     @staticmethod
     def run_in_new_loop(jobs):
@@ -94,20 +98,29 @@ class Producer:
                     count += 1
                     if count % concurrent_connections == 0:
                         offset += 5
+        return jobs
 
     async def send_outputs(self):
+        filt = QueueFilter(self.output_queue, interval=self.send_every)
         async with aiohttp.ClientSession() as sess:
-            for data in queue_filter(self.output_queue, interval=self.send_every):
+            async for data in filt:
                 async with sess.post('http://192.168.1.53:9999', data=json.dumps(data)) as resp:
                     _ = await resp.text()
 
+    async def prnt(self):
+        while True:
+            item = await self.result_queue.get()
+            print(item)
+
     def run(self):
+        pool = ProcessPoolExecutor(2)
+        preprocessor = PreProcessor(self.result_queue, self.preprocess_queue, pool)
         main_loop = asyncio.get_event_loop()
         jobs = main_loop.run_until_complete(self.get_jobs())
         for set_of_jobs in jobs:
-            Process(target=self.run_in_new_loop, args=(set_of_jobs,)).start()
-        main_loop.run_until_complete(asyncio.gather(self.aggregate_queues(), self.send_outputs(),
-                                                    download(self.url_queue, self.result_queue)))
+            Thread(target=self.run_in_new_loop, args=(set_of_jobs,)).start()
+        main_loop.run_until_complete(asyncio.gather(preprocessor.run(), download(self.url_queue, self.result_queue),
+                                                    self.aggregate_queues(), self.send_outputs(), self.prnt()))
 
 
 if __name__ == '__main__':
