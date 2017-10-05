@@ -1,5 +1,9 @@
+import json
 import os
-from multiprocessing import Queue
+from collections import defaultdict
+from multiprocessing import Queue, Process
+
+import aiohttp
 
 from veryscrape.request import download, get_auth
 from veryscrape.scrape import *
@@ -19,8 +23,25 @@ def load_query_dictionary(file_name):
     return queries
 
 
+def queue_filter(queue, interval=60):
+    data = defaultdict(partial(defaultdict, list))
+    start = time.time()
+    while True:
+        if not queue.empty():
+            item = queue.get_nowait()
+            data[item.source][item.topic].append(item.content)
+        if time.time() - start >= interval:
+            start = time.time()
+            averages = {t: {k: sum(s) / max(1, len(s)) for k, s in qs.items()} for t, qs in data.items()}
+            yield averages
+            for t, qs in data.items():
+                for k in qs:
+                    data[t][k] = []
+
+
 class Producer:
-    def __init__(self):
+    def __init__(self, send_every=60):
+        self.send_every = send_every
         self.topics = load_query_dictionary('query_topics')
         self.subreddits = load_query_dictionary('subreddits')
         self.url_queue = asyncio.Queue()
@@ -46,9 +67,10 @@ class Producer:
         policy = asyncio.get_event_loop_policy()
         policy.set_event_loop(policy.new_event_loop())
         new_loop = asyncio.get_event_loop()
-        new_loop.run_until_complete(asyncio.gather(*jobs))
+        new_loop.run_until_complete(asyncio.gather(*[f() for f in jobs]))
 
     async def get_jobs(self):
+        jobs = [[], [], [], []]
         twingly_auth = (await get_auth('twingly'))[0][0]
         twitter_auth = iter(await get_auth('twitter'))
         reddit_auth = iter(await get_auth('reddit'))
@@ -58,30 +80,36 @@ class Producer:
 
         concurrent_connections = 10
         offset, count = 0, 0
-        jobs = [[download(self.url_queue, self.result_queue)], [], [], [], [], []]
-
         for t in self.topics:
-            #jobs[-1].append(finance.scrape_forever(0, 60, t, t, self.output_queue, use_proxy=True))
+            jobs[0].append(partial(finance.scrape_forever, 0, 60, t, t, self.output_queue, use_proxy=True))
             twitter = InfiniteScraper(Twitter, next(twitter_auth))
             reddit = InfiniteScraper(Reddit, next(reddit_auth))
 
             for q, sr in zip(self.topics[t], self.subreddits[t]):
-                    #jobs[1].append(twitter.scrape_forever(offset, 0.25, q, t, self.result_queue, use_proxy=True))
-                    jobs[2].append(reddit.scrape_forever(offset, 15, sr, t, self.result_queue))
-
-                    #for scraper, up, ind in zip(url_scrapers, [False, True], [3, 4]):
-                    #    jobs[ind].append(scraper.scrape_forever(offset, 900, q, t, self.url_queue, use_proxy=up))
+                    jobs[1].append(partial(twitter.scrape_forever, offset, 0.25, q, t, self.result_queue, use_proxy=True))
+                    jobs[2].append(partial(reddit.scrape_forever, offset, 15, sr, t, self.result_queue))
+                    for scraper, up in zip(url_scrapers, [False, True]):
+                        jobs[3].append(partial(scraper.scrape_forever, offset, 900, q, t, self.url_queue, use_proxy=up))
 
                     count += 1
                     if count % concurrent_connections == 0:
                         offset += 5
-        jobs.append([self.prnt()])
-        return jobs
+
+    async def send_outputs(self):
+        async with aiohttp.ClientSession() as sess:
+            for data in queue_filter(self.output_queue, interval=self.send_every):
+                async with sess.post('http://192.168.1.53:9999', data=json.dumps(data)) as resp:
+                    _ = await resp.text()
+
+    def run(self):
+        main_loop = asyncio.get_event_loop()
+        jobs = main_loop.run_until_complete(self.get_jobs())
+        for set_of_jobs in jobs:
+            Process(target=self.run_in_new_loop, args=(set_of_jobs,)).start()
+        main_loop.run_until_complete(asyncio.gather(self.aggregate_queues(), self.send_outputs(),
+                                                    download(self.url_queue, self.result_queue)))
 
 
 if __name__ == '__main__':
     producer = Producer()
-    loop = asyncio.get_event_loop()
-    js = loop.run_until_complete(producer.get_jobs())
-    # for set_of_jobs in js:
-    #     Process(target=producer.run_in_new_loop, args=(set_of_jobs,)).start()
+    producer.run()
