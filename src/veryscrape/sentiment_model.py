@@ -3,19 +3,19 @@
 # input_x, predictions
 import os
 
-import numpy as np
 import tensorflow as tf
 import tensorflow.contrib as ctb
-from gensim.models import Word2Vec
+from gensim.models import KeyedVectors
 
 bdr = tf.nn.bidirectional_dynamic_rnn
 
 
 class Model:
     def __init__(self, base_directory):
+        n_classes = 2
         # Input layer
-        self.input_x = tf.placeholder(tf.int32, [None, 30, 30], name='x')
-        self.input_y = tf.placeholder(tf.int32, [None, 2], name='y')
+        self.input_x = tf.placeholder(tf.int32, [None, 20, 10], name='x')
+        self.input_y = tf.placeholder(tf.int32, [None, n_classes], name='y')
 
         with tf.variable_scope('Init'):
             # Weights
@@ -33,11 +33,8 @@ class Model:
 
         # Embeddings
         with tf.variable_scope("Embedding"), tf.device('/cpu:0'):
-            m = Word2Vec.load(os.path.join(base_directory, 'lib', 'bin', 'word2vec', 'model'))
-            emb_mat = np.zeros([len(m.wv.vocab) + 2, 200])
-            emb_mat[0:2] = np.random.uniform(2, 200)
-            for w in m.wv.vocab:
-                emb_mat[m.wv.vocab[w].index + 2, :] = m.wv[w]
+            m = KeyedVectors.load(os.path.join(base_directory, 'bin', 'word2vec', 'GoogleNews-250k'))
+            emb_mat = m.syn0
             del m
             embedding_matrix = tf.constant(emb_mat, dtype=tf.float32)
             embedded_input = tf.nn.embedding_lookup(embedding_matrix, self.input_x)
@@ -48,7 +45,7 @@ class Model:
             with tf.variable_scope('encoder') as sc:
                 word_level_inputs = tf.reshape(embedded_input, [-1,
                                                                 30,
-                                                                200])
+                                                                300])
                 (fw_outputs, bw_outputs), _ = bdr(cell_fw=word_cell_fw, cell_bw=word_cell_bw,
                                                   inputs=word_level_inputs,
                                                   dtype=tf.float32, swap_memory=True, scope=sc)
@@ -83,5 +80,5 @@ class Model:
                 sentence_level_outputs = tf.reduce_sum(weighted_projection, axis=1)
         # Prediction
         with tf.variable_scope("Prediction"):
-            self.predictions = ctb.layers.fully_connected(sentence_level_outputs, 2,
+            self.predictions = ctb.layers.fully_connected(sentence_level_outputs, n_classes,
                                                           activation_fn=tf.nn.softmax)
