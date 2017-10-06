@@ -1,10 +1,15 @@
 import asyncio
+import os
 import tkinter as tk
+from collections import deque
+from datetime import datetime
 from functools import partial
+from multiprocessing.connection import Listener
 from threading import Thread
+
 import aiohttp
 import aiohttp.web as web
-import os
+from sqlalchemy import create_engine, Table, MetaData, Column, Float, DateTime
 
 RED, GREEN = '#ff8080', '#9fff80'
 
@@ -18,6 +23,69 @@ def load_query_dictionary(file_name):
             x, y = l.split(':')
             queries[x] = y.split(',')
     return queries
+
+
+class QueueWriter(Thread):
+    def __init__(self, queue):
+        super(QueueWriter, self).__init__()
+        self.queue = queue
+        self.db = create_engine('sqlite:///data/companyData.db')
+        self.db.echo = False
+        self.table_names = ['article', 'blog', 'twitter', 'reddit', 'stock']
+        self.companies = sorted(list(load_query_dictionary('query_topics')))
+        self.tables = {}
+        for t in self.table_names:
+            self.tables[t] = Table(t, MetaData(self.db),
+                                   Column('time', DateTime, primary_key=True),
+                                   *[Column(i, Float) for i in self.companies])
+            if t not in self.db.table_names():
+                self.tables[t].create()
+
+    def update_database(self, data):
+        current_time = datetime.now()
+        for k in self.tables:
+            i = self.tables[k].insert()
+            data[k].update(time=current_time)
+            i.execute(data[k])
+
+    def run(self):
+        while True:
+            data = self.queue.get()
+            self.update_database(data)
+
+
+class StockGymEndPoint(Thread):
+    def __init__(self, queue):
+        super(StockGymEndPoint, self).__init__()
+        self.queue = queue
+        self.server = Listener(('localhost', 6100), authkey=b'veryscrape')
+        self.conn = None
+        self.max_items_in_queue = 10
+
+    def accept_next(self):
+        while True:
+            try:
+                self.conn = self.server.accept()
+                break
+            except:
+                continue
+
+    def run(self):
+        self.accept_next()
+        while True:
+            if self.queue.qsize() > self.max_items_in_queue:
+                allowed_items = deque(maxlen=self.max_items_in_queue)
+                while not self.queue.empty():
+                    allowed_items.append(self.queue.get_nowait())
+                for item in allowed_items:
+                    self.queue.put(item)
+            else:
+                data = self.queue.get()
+                try:
+                    self.conn.send(data)
+                except:
+                    self.accept_next()
+                    self.conn.send(data)
 
 
 class StreamStatusPage(tk.Frame):
@@ -89,6 +157,11 @@ class GUI(tk.Tk):
 
     def pull(self):
         companies = list(sorted(load_query_dictionary('query_topics').keys()))
+        if self.queue.qsize() >= 2:
+            last = self.queue.get_nowait()
+            while not self.queue.empty():
+                last = self.queue.get_nowait()
+            self.queue.put(last)
         while self.running:
             if not self.queue.empty():
                 data = self.queue.get_nowait()
@@ -117,9 +190,11 @@ class Controller(tk.Tk):
 class MainServer(web.Server):
     def __init__(self, **kwargs):
         super(MainServer, self).__init__(self.process_request, **kwargs)
-        self.queues = [asyncio.Queue()] * 1
+        self.queues = [asyncio.Queue()] * 3
         self.expected_keys = ['article', 'blog', 'reddit', 'twitter', 'stock']
         Thread(target=lambda: Controller(self.queues[0]).mainloop()).start()
+        QueueWriter(self.queues[1]).start()
+        StockGymEndPoint(self.queues[2]).start()
 
     async def process_request(self, request):
         try:
