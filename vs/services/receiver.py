@@ -193,8 +193,8 @@ class MainServer(web.Server):
         self.queues = [asyncio.Queue()] * 3
         self.expected_keys = ['article', 'blog', 'reddit', 'twitter', 'stock']
         Thread(target=lambda: Controller(self.queues[0]).mainloop()).start()
-        #QueueWriter(self.queues[1]).start()
-        #StockGymEndPoint(self.queues[2]).start()
+        QueueWriter(self.queues[1]).start()
+        StockGymEndPoint(self.queues[2]).start()
 
     async def process_request(self, request):
         try:
