@@ -30,15 +30,17 @@ class QueueFilter:
         self.interval = interval
         self.data = defaultdict(partial(defaultdict, list))
         self.start = time.time()
+        self.companies = sorted(list(load_query_dictionary('query_topics').keys()))
 
     async def __anext__(self):
+        averages = {k: {c: 0. for c in self.companies} for k in ['article', 'blog', 'reddit', 'twitter', 'stock']}
         while time.time() - self.start <= self.interval:
             if not self.queue.empty():
                 item = self.queue.get_nowait()
                 self.data[item.source][item.topic].append(item.content)
             await asyncio.sleep(0)
         self.start = time.time()
-        averages = {t: {k: sum(s) / max(1, len(s)) for k, s in qs.items()} for t, qs in self.data.items()}
+        averages.update({t: {k: sum(s) / max(1, len(s)) for k, s in qs.items()} for t, qs in self.data.items()})
         for t, qs in self.data.items():
             for k in qs:
                 self.data[t][k] = []

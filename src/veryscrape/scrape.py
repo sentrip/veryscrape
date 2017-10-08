@@ -202,4 +202,3 @@ class Finance(RequestBuilder):
             stock_price = eval(tmp.group(2).replace(',', ''))
         item = Item(stock_price, topic, 'article')
         await queue.put(item)
-

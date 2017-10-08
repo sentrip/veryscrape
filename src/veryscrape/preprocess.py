@@ -13,7 +13,7 @@ from gensim.models.phrases import Phraser
 from newspaper import Config, extractors, cleaners, outputformatters
 from nltk.tokenize import sent_tokenize, wordpunct_tokenize
 
-from vs import Item
+from veryscrape.request import Item
 
 
 class PreProcessor:
@@ -33,21 +33,19 @@ class PreProcessor:
         self.extractor = extractors.ContentExtractor(config)
         self.cleaner = cleaners.DocumentCleaner(config)
         self.formatter = outputformatters.OutputFormatter(config)
+        self.base = os.getcwd()[:os.getcwd().find('src')] + 'src/veryscrape/'
 
-    @staticmethod
-    def load_vocab():
+    def load_vocab(self):
         """Loads vocabulary from Word2Vec model in base directory"""
         vocab = defaultdict(partial(int, 1))
-        model = KeyedVectors.load(os.path.join('bin', 'word2vec', 'GoogleNewsSmall'))
-        for word in model.vocab:
-            # Add 2 to index: 0 - blank, 1 - unknown
-            vocab[word] = model.vocab[word].index + 2
+        model = KeyedVectors.load(os.path.join(self.base, 'bin', 'word2vec', 'GoogleNews-250k'))
+        for i, word in enumerate(model.index2word):
+            vocab[word] = i
         return vocab
 
-    @staticmethod
-    def load_ngram():
+    def load_ngram(self):
         """Loads vocabulary from Word2Vec model in base directory"""
-        bigram = Phraser.load(os.path.join('bin', 'word2vec', 'bigram'))
+        bigram = Phraser.load(os.path.join(self.base, 'bin', 'word2vec', 'bigram'))
         return bigram
 
     @staticmethod
