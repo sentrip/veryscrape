@@ -28,23 +28,21 @@ class Sentiment(Thread):
             items = self.input.get()
             features = np.array([item.content for item in items], dtype=np.int32)
             predictions = sess.run(model.predictions, feed_dict={model.input_x: features})
-            sentiments = []
             for i, item in enumerate(items):
                 new_item = Item(predictions[i][1], item.topic, item.source)
-                sentiments.append(new_item)
-            for item in sentiments:
-                self.output.put(item)
+                self.output.put(new_item)
 
     def run(self):
         batch_queue = Queue()
         with tf.Session() as sess:
-            items = []
-            base = os.path.join(os.getcwd(), *[i for i in ['src', 'veryscrape'] if i not in os.getcwd()])
-            pth = os.path.join('bin', 'sentiment', 'binary')
-            model = Model(base)
+            base = os.path.join(os.getcwd(), 'src/veryscrape' if 'src' not in os.getcwd() else '').replace('vstest', 'veryscrape')
+            pth = os.path.join(base, 'bin', 'sentiment', 'binary')
+            model = Model()
             tf.train.Saver().restore(sess, pth)
             place_in_queue = time.time()
             Thread(target=self.calculate_sentiments_from_queue, args=(sess, model, batch_queue,)).start()
+
+            items = []
             while True:
                 if not self.input.empty():
                     item = self.input.get_nowait()
@@ -66,7 +64,7 @@ class SentimentAverage(Thread):
         self.types = ['reddit', 'twitter', 'article', 'blog']
         self.topics = sorted(list(load_query_dictionary('query_topics')))
         self.current_sentiments = {t: {q: [] for q in self.types} for t in self.topics}
-        self.last_sentiments = {t: {q: -1 for q in self.types} for t in self.topics}
+        self.last_sentiments = {t: {q: 0. for q in self.types} for t in self.topics}
 
         self.count = 0
         self.items_per_second = 0

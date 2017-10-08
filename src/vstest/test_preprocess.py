@@ -3,7 +3,6 @@ import random
 import re
 import unittest
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Queue
 
 import numpy as np
@@ -32,9 +31,7 @@ class TestPreProcess(unittest.TestCase):
     current = os.getcwd()[:os.getcwd().find('src')] + 'src/vstest/'
     input_queue = Queue()
     output_queue = Queue()
-    pool = ProcessPoolExecutor(1)
-    client = PreProcessor(input_queue, output_queue, pool)
-    client.bigram = client.load_ngram()
+    client = PreProcessor(input_queue, output_queue)
     client.vocab = client.load_vocab()
     tweets, comments, htmls = load_data(current + 'data')
 
@@ -49,10 +46,6 @@ class TestPreProcess(unittest.TestCase):
         assert isinstance(v, defaultdict), "Incorrect dictionary format returned"
         assert len(v) == 250000, 'Vocab of incorrect length'
         assert v['</s>'] == 0, 'Vocab not correctly loaded'
-
-    def test_load_bigram(self):
-        v = self.client.load_ngram()
-        assert v[['new', 'york']] == ['new_york'], "Bigram does not correctly convert new york"
 
     def test_clean_tweet(self):
         """Test string cleaning for tweets"""
@@ -95,5 +88,5 @@ class TestPreProcess(unittest.TestCase):
         """Test string conversion to feature vector"""
         sent = 'hello this is my sentence, i would like to test the feature conversion! please give me a good matrix.'
         item = self.client.feature_convert(Item(sent, '', ''))
-        assert item.content.shape == (30, 30), "Incorrect shape of features returned, {}".format(item.content.shape)
-        assert np.sum(np.sum(item.content, axis=1)) > 0, 'No words were found'
+        assert item.content.shape == (150, ), "Incorrect shape of features returned, {}".format(item.content.shape)
+        assert np.sum(np.sum(item.content, axis=0)) > 0, 'No words were found'

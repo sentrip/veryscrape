@@ -16,7 +16,7 @@ class TestRequestBasicFunctions(unittest.TestCase):
         types = ['twingly', 'reddit', 'twitter']
         auths = await asyncio.gather(*[get_auth(t) for t in types])
         for auth in auths:
-            assert isinstance(auth, list), 'Incorrect auth data type returned!, {}'.format(type(auth))
+            assert isinstance(auth, list) or isinstance(auth, str), 'Incorrect auth data type returned!, {}'.format(type(auth))
             assert len(auth) >= 1, 'No authentications returned, {}'.format(auth)
 
     @synchronous

@@ -1,29 +1,27 @@
-import asyncio
 import os
 import re
 from collections import defaultdict
 from functools import partial
+from multiprocessing import Process
 from xml.sax.saxutils import unescape
 
 import lxml.etree as etree
 import lxml.html as html
-import numpy as np
 from gensim.models import KeyedVectors
-from gensim.models.phrases import Phraser
 from newspaper import Config, extractors, cleaners, outputformatters
-from nltk.tokenize import sent_tokenize, wordpunct_tokenize
+from nltk.corpus import stopwords
+from nltk.tokenize import wordpunct_tokenize
+from numpy import array
 
 from veryscrape.request import Item
 
 
-class PreProcessor:
-    def __init__(self, input_queue, output_queue, pool):
+class PreProcessor(Process):
+    def __init__(self, input_queue, output_queue):
         super(PreProcessor, self).__init__()
         self.input = input_queue
         self.output = output_queue
-        self.pool = pool
         self.vocab = None
-        self.bigram = None
         self.clean_functions = {'reddit': self.clean_reddit_comment, 'twitter': self.clean_tweet,
                                 'blog': self.clean_article, 'article': self.clean_article}
         # Html to article conversion with newspaper setup
@@ -33,7 +31,8 @@ class PreProcessor:
         self.extractor = extractors.ContentExtractor(config)
         self.cleaner = cleaners.DocumentCleaner(config)
         self.formatter = outputformatters.OutputFormatter(config)
-        self.base = os.getcwd()[:os.getcwd().find('src')] + 'src/veryscrape/'
+        self.base = os.path.join(os.getcwd(), 'src/veryscrape' if 'src' not in os.getcwd() else '').replace('vstest', 'veryscrape')
+        self.stopwords = set(stopwords.words('english') + list('~!@#$%^&*()_+{}|":?><><`1234567890-=][;,./\'\\'))
 
     def load_vocab(self):
         """Loads vocabulary from Word2Vec model in base directory"""
@@ -42,11 +41,6 @@ class PreProcessor:
         for i, word in enumerate(model.index2word):
             vocab[word] = i
         return vocab
-
-    def load_ngram(self):
-        """Loads vocabulary from Word2Vec model in base directory"""
-        bigram = Phraser.load(os.path.join(self.base, 'bin', 'word2vec', 'bigram'))
-        return bigram
 
     @staticmethod
     def clean_tweet(item):
@@ -92,17 +86,12 @@ class PreProcessor:
         content = re.sub(r'\x20{2,}', ' ', content)
         return Item(content, item.topic, item.source)
 
-    def feature_convert(self, item, document_length=30, sentence_length=30):
+    def feature_convert(self, item, sentence_length=150):
         """Convert text of an item vector of shape [document_length * sentence_length] with word ids in the vector"""
-        # Split sentences
-        word_list_generator = map(wordpunct_tokenize, sent_tokenize(item.content, language='english'))
-        # Initialize feature vector
-        features = np.zeros([document_length, sentence_length], dtype=np.int32)
-        for i, sentence in enumerate(self.bigram[word_list_generator]):
-            for j, word in enumerate(sentence):
-                if i < document_length and j < sentence_length:
-                    features[i][j] = self.vocab[word]
-        return Item(features, item.topic, item.source)
+        words = wordpunct_tokenize(item.content)[:sentence_length]
+        features = [self.vocab[word] for word in words if word not in self.stopwords]
+        features += [0] * (sentence_length - len(features))
+        return Item(array(features), item.topic, item.source)
 
     def clean_item(self, item):
         item = self.clean_functions[item.source](item)
@@ -110,21 +99,11 @@ class PreProcessor:
         item = self.feature_convert(item)
         return item
 
-    def send_to_output(self, future):
-        if not future.exception() and not future.cancelled():
-            item = future.result()
-            if item.content != 'failed' and item.topic and item.source:
-                self.output.put(item)
-
-    async def run(self):
+    def run(self):
         self.vocab = self.load_vocab()
-        await asyncio.sleep(0)
-        self.bigram = self.load_ngram()
-        await asyncio.sleep(0)
-
         while True:
             if not self.input.empty():
                 item = self.input.get_nowait()
-                future = self.pool.submit(self.clean_item, item)
-                future.add_done_callback(self.send_to_output)
-            await asyncio.sleep(0)
+                item = self.clean_item(item)
+                if item.content != 'failed' and item.topic and item.source:
+                    self.output.put(item)

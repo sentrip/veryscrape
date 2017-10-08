@@ -22,11 +22,11 @@ async def get_auth(auth_type):
     """Requests api server for corresponding authentication information"""
     api_url = 'http://192.168.0.100:1111'
     async with aiohttp.ClientSession() as sess:
-        async with sess.get(api_url, params={'type': auth_type}) as response:
+        async with sess.get(api_url, params={'q': auth_type}) as response:
             resp = await response.text()
     try:
-        return json.loads(resp)['auth']
-    except (KeyError, TypeError, json.JSONDecodeError):
+        return eval(resp)
+    except (KeyError, TypeError):
         return []
 
 
