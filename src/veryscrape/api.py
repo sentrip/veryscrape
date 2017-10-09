@@ -169,7 +169,7 @@ class BaseScraper:
         return False
 
     @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_jitter_max=500)
-    async def scrape(self, query, topic, queue, use_proxy=False, setup=None, resp_handler=None):
+    async def scrape(self, query, topic, queue, use_proxy=False, setup=None, resp_handler=None, **rh_kwargs):
         """Scrapes resources provided in setup method and handles response with handle_response method"""
         if setup is None:
             setup = self.setup
@@ -180,7 +180,7 @@ class BaseScraper:
         method, url, params, kwargs = await setup()
         async with aiohttp.ClientSession() as sess:
             async with sess.request(method, url, params=params, **kwargs) as raw:
-                await resp_handler(raw, topic, queue)
+                await resp_handler(raw, topic, queue, **rh_kwargs)
 
 
 class ReadBuffer:

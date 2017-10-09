@@ -24,7 +24,8 @@ class Twitter(BaseScraper):
         setup = partial(self.build_request, 'POST', 'statuses/filter.json', oauth=1, params=params, use_proxy=use_proxy)
         return setup
 
-    async def handle_response(self, resp, topic, queue):
+    async def handle_response(self, resp, topic, queue, stream_for=100000000):
+        start = time.time()
         if resp.status == 420:
             await asyncio.sleep(self.retry_420)
         elif resp.status != 200:
@@ -32,6 +33,8 @@ class Twitter(BaseScraper):
         else:
             buffer = ReadBuffer(resp)
             async for status in buffer:
+                if time.time() - start >= stream_for:
+                    break
                 if self.filter(status['text']):
                     item = Item(status['text'], topic, 'twitter')
                     await queue.put(item)
@@ -61,7 +64,7 @@ class Reddit(BaseScraper):
         setup = partial(self.build_request, 'GET', self.comment.format(query), oauth=2, use_proxy=False)
         return setup
 
-    async def handle_comments(self, resp, topic, queue):
+    async def handle_comments(self, resp, topic, queue, **kwargs):
         if resp.status == 403:
             raise ConnectionError('Could not connect to reddit')
         else:
@@ -76,7 +79,7 @@ class Reddit(BaseScraper):
                 item = Item(c['data']['body'], topic, 'reddit')
                 await queue.put(item)
 
-    async def handle_response(self, resp, topic, queue):
+    async def handle_response(self, resp, topic, queue, **kwargs):
         resp = await resp.json()
         for i in resp['data']['children']:
             link = i['data']['id']
@@ -97,7 +100,7 @@ class Twingly(BaseScraper):
                         params={'q': query_string, 'apiKey': self.client})
         return setup
 
-    async def handle_response(self, resp, topic, queue):
+    async def handle_response(self, resp, topic, queue, **kwargs):
         if resp.status == 401:
             raise ConnectionError('Could not connect to twingly')
         else:
@@ -119,7 +122,7 @@ class Google(BaseScraper):
         setup = partial(self.build_request, 'GET', '{}/{}?hl=en&ned=us'.format(query, query), use_proxy=use_proxy)
         return setup
 
-    async def handle_response(self, resp, topic, queue):
+    async def handle_response(self, resp, topic, queue, **kwargs):
         if resp.status != 200:
             raise ConnectionError('Could not connect to google')
         else:
@@ -144,7 +147,7 @@ class Finance(BaseScraper):
         setup = partial(self.build_request, 'GET', 'finance?', params={'q': query}, use_proxy=use_proxy)
         return setup
 
-    async def handle_response(self, resp, topic, queue):
+    async def handle_response(self, resp, topic, queue, **kwargs):
         if resp.status != 200:
             raise ConnectionError('Could not connect to finance')
         else:

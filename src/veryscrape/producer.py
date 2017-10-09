@@ -20,15 +20,15 @@ class QueueFilter:
     async def __anext__(self):
         averages = {k: {c: 0. for c in self.companies} for k in ['article', 'blog', 'reddit', 'twitter', 'stock']}
         while time.time() - self.start <= self.interval:
-            if not self.queue.empty():
-                item = self.queue.get_nowait()
-                self.data[item.source][item.topic].append(item.content)
-            await asyncio.sleep(0)
-        self.start = time.time()
+            item = await self.queue.get()
+            self.data[item.source][item.topic].append(item.content)
+
         averages.update({t: {k: sum(s) / max(1, len(s)) for k, s in qs.items()} for t, qs in self.data.items()})
         for t, qs in self.data.items():
             for k in qs:
                 self.data[t][k] = []
+
+        self.start = time.time()
         return averages
 
     def __aiter__(self):
@@ -63,15 +63,15 @@ class Producer:
         off, count = 0, 0
 
         for t, qs in self.topics.items():
-            args.append((finance, [], {}))
+            args.append((finance, [0, 60, t, t, self.output_queue], {'use_proxy': True}))
 
             twitter = InfiniteScraper(Twitter, next(twitter_auth))
             reddit = InfiniteScraper(Reddit, next(reddit_auth))
 
             for q, sr in zip(qs, self.subreddits[t]):
                 args.append((twingly, [off, 900, q, t, self.url_queue], {}))
-                args.append((google, [off, 900, q, t, self.url_queue], {}))
-                args.append((twitter, [off, 0.25, q, t, self.result_queue], {}))
+                args.append((google, [off, 900, q, t, self.url_queue], {'use_proxy': True}))
+                args.append((twitter, [off, 0.25, q, t, self.result_queue], {'use_proxy': True}))
                 args.append((reddit, [off, 15, q, t, self.result_queue], {}))
 
                 count += 1
