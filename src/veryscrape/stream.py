@@ -50,7 +50,8 @@ async def download(url_queue, result_queue, duration=0):
 
 def scrape_handler(ex):
     """Exception handler for circuit broken wrapper"""
-    allowed = [ConnectionError, aiohttp.ClientError, aiohttp.ServerDisconnectedError, ssl.CertificateError]
+    allowed = [aiohttp.ClientError, aiohttp.ServerDisconnectedError, aiohttp.ClientOSError,
+               ssl.CertificateError, ConnectionError, KeyError]
     for a_ex in allowed:
         if isinstance(ex, a_ex):
             return

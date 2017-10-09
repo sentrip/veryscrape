@@ -21,38 +21,44 @@ class Model:
         # Input layer
         self.input_x = tf.placeholder(tf.int32, [None, 150], name='x')
         base = os.path.join(os.getcwd(), 'src/veryscrape' if 'src' not in os.getcwd() else '').replace('vstest', 'veryscrape')
-        m = KeyedVectors.load(os.path.join(base, 'bin', 'word2vec', 'GoogleNews-250k'))
-        emb_mat = tf.constant(m.syn0)
-        del m
 
-        # Weights
-        weights = [tf.get_variable(name='attention_vector_{}'.format(i), shape=[100 * 2], dtype=tf.float32,
-                                   initializer=ctb.layers.xavier_initializer()) for i in range(5)]
-        # Word & sentence encoders, input lengths
-        word_cell_fw = ctb.rnn.GRUCell(100)
-        word_cell_bw = ctb.rnn.GRUCell(100)
+        with tf.variable_scope('MAN'):
+            m = KeyedVectors.load(os.path.join(base, 'bin', 'word2vec', 'GoogleNews-250k'))
+            emb_mat = tf.constant(m.syn0)
+            del m
 
-        # Embeddings
-        with tf.device('/cpu:0'):
-            embedded_input = tf.nn.embedding_lookup(emb_mat, self.input_x)
+            # Weights
+            weights = [tf.get_variable(name='attention_vector_{}'.format(i), shape=[100 * 2], dtype=tf.float32,
+                                       initializer=ctb.layers.xavier_initializer()) for i in range(5)]
+            # Word & sentence encoders, input lengths
+            word_cell_fw = ctb.rnn.GRUCell(100)
+            word_cell_bw = ctb.rnn.GRUCell(100)
 
-        # Encodings
-        (fw_outputs, bw_outputs), _ = bdr(cell_fw=word_cell_fw, cell_bw=word_cell_bw, inputs=embedded_input,
-                                          dtype=tf.float32, swap_memory=True)
-        word_encoder_outputs = tf.concat((fw_outputs, fw_outputs), 2)
+            # Embeddings
+            with tf.variable_scope("Embedding"), tf.device('/cpu:0'):
+                embedded_input = tf.nn.embedding_lookup(emb_mat, self.input_x)
 
-        # Attention
-        input_projection = ctb.layers.fully_connected(word_encoder_outputs, 100 * 2, activation_fn=tf.tanh)
-        attention_weights = tf.multiply(input_projection, weights[0])
-        for att_w in weights[1:]:
-            attention_weights = tf.multiply(attention_weights, att_w)
-        attention_weights = tf.nn.softmax(attention_weights)
-        weighted_projection = tf.multiply(word_encoder_outputs, attention_weights)
-        word_level_outputs = tf.reduce_sum(weighted_projection, axis=1)
+            # Word level
+            with tf.variable_scope('Word'):
+                # Word encoding
+                with tf.variable_scope('encoder') as sc:
+                    (fw_outputs, bw_outputs), _ = bdr(cell_fw=word_cell_fw, cell_bw=word_cell_bw, inputs=embedded_input,
+                                                      dtype=tf.float32, swap_memory=True, scope=sc)
+                    word_encoder_outputs = tf.concat((fw_outputs, fw_outputs), 2)
 
-        # Prediction
-        with tf.variable_scope("Prediction"):
-            self.predictions = ctb.layers.fully_connected(word_level_outputs, 2, activation_fn=tf.nn.softmax)
+                # Word attention
+                with tf.variable_scope('attention'):
+                    input_projection = ctb.layers.fully_connected(word_encoder_outputs, 100 * 2, activation_fn=tf.tanh)
+                    attention_weights = tf.multiply(input_projection, weights[0])
+                    for att_w in weights[1:]:
+                        attention_weights = tf.multiply(attention_weights, att_w)
+                    attention_weights = tf.nn.softmax(attention_weights)
+                    weighted_projection = tf.multiply(word_encoder_outputs, attention_weights)
+                    word_level_outputs = tf.reduce_sum(weighted_projection, axis=1)
+
+            # Prediction
+            with tf.variable_scope("Prediction"):
+                self.predictions = ctb.layers.fully_connected(word_level_outputs, 2, activation_fn=tf.nn.softmax)
 
 
 class Sentiment(Thread):
@@ -63,15 +69,16 @@ class Sentiment(Thread):
         self.input = input_queue
         self.output = output_queue
 
-    def calculate_sentiments_from_queue(self, sess, model):
+    def calculate_sentiments_from_queue(self, sess, model, q):
         """Runs the sentiment calculator neural network on batch of incoming texts"""
         while True:
-            items = self.input.get()
+            items = q.get()
             features = np.array([item.content for item in items], dtype=np.int32)
             predictions = sess.run(model.predictions, feed_dict={model.input_x: features})
             for i, item in enumerate(items):
                 new_item = Item(predictions[i][1], item.topic, item.source)
                 self.output.put(new_item)
+            time.sleep(0.001)
 
     def run(self):
         batch_queue = Queue()
@@ -85,14 +92,13 @@ class Sentiment(Thread):
 
             items = []
             while True:
-                if not self.input.empty():
-                    item = self.input.get_nowait()
-                    items.append(item)
-                    if len(items) >= self.batch_size or (time.time() - place_in_queue >= 1 and len(items) > 0):
-                        batch_queue.put(items)
-                        place_in_queue = time.time()
-                        items = []
-
+                item = self.input.get()
+                items.append(item)
+                if len(items) >= self.batch_size or (time.time() - place_in_queue >= 1 and len(items) > 0):
+                    batch_queue.put(items)
+                    place_in_queue = time.time()
+                    items = []
+                time.sleep(0.001)
 
 # class SentimentAverage(Thread):
 #     """Sentiment calculation thread, sends average sentiments per time period calculated for all incoming items"""

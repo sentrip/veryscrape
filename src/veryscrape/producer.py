@@ -1,11 +1,13 @@
 import json
 from collections import defaultdict
-from multiprocessing import Queue, Process
+from multiprocessing import Queue
+from threading import Thread
 
 import aiohttp
 
 from veryscrape.extensions import *
 from veryscrape.preprocess import PreProcessor
+from veryscrape.sentiment import Sentiment
 from veryscrape.stream import download, get_topics, InfiniteScraper
 
 
@@ -50,7 +52,7 @@ class Producer:
         self.output_queue = asyncio.Queue()
 
     async def build_args_and_kwargs(self, concurrent_connections=10):
-        args = []
+        args = [[], [], [], [], []]
         b = BaseScraper()
         twingly_auth = await b.get_api_data('twingly')
         twitter_auth = iter(await b.get_api_data('twitter'))
@@ -62,17 +64,17 @@ class Producer:
 
         off, count = 0, 0
 
-        for t, qs in self.topics.items():
-            args.append((finance, [0, 60, t, t, self.output_queue], {'use_proxy': True}))
+        for t, qs in list(self.topics.items())[:5]:
+            args[0].append((finance, [0, 60, t, t, self.output_queue], {'use_proxy': True}))
 
             twitter = InfiniteScraper(Twitter, next(twitter_auth))
             reddit = InfiniteScraper(Reddit, next(reddit_auth))
 
             for q, sr in zip(qs, self.subreddits[t]):
-                args.append((twingly, [off, 900, q, t, self.url_queue], {}))
-                args.append((google, [off, 900, q, t, self.url_queue], {'use_proxy': True}))
-                args.append((twitter, [off, 0.25, q, t, self.result_queue], {'use_proxy': True}))
-                args.append((reddit, [off, 15, q, t, self.result_queue], {}))
+                args[1].append((twingly, [off, 900, q, t, self.url_queue], {}))
+                args[2].append((google, [off, 900, q, t, self.url_queue], {'use_proxy': True}))
+                args[3].append((twitter, [off, 0.25, q, t, self.result_queue], {'use_proxy': True}))
+                args[4].append((reddit, [off, 15, sr, t, self.result_queue], {}))
 
                 count += 1
                 if count % concurrent_connections == 0:
@@ -94,34 +96,31 @@ class Producer:
                 async with sess.post(self.item_server_url, data=json.dumps(data)) as resp:
                     _ = await resp.text()
 
-    @staticmethod
-    def run_in_new_loop(args_list):
-        policy = asyncio.get_event_loop_policy()
-        policy.set_event_loop(policy.new_event_loop())
-        new_loop = asyncio.get_event_loop()
-        jobs = []
-        for scraper, args, kwargs in args_list:
-            jobs.append(scraper.scrape_forever(*args, **kwargs))
-        new_loop.run_until_complete(asyncio.gather(*jobs))
-
     def run(self):
         main_loop = asyncio.get_event_loop()
 
         main_args_list = main_loop.run_until_complete(self.build_args_and_kwargs())
+        jobs = []
         for args_list in main_args_list:
-            Process(target=self.run_in_new_loop, args=(args_list,)).start()
+            for set_of_args in args_list:
+                jobs.append(set_of_args[0].scrape_forever(*set_of_args[1], **set_of_args[2]))
 
-        preprocessor = PreProcessor(self.result_queue, self.preprocess_queue)
-        main_loop.run_until_complete(asyncio.gather(download(self.url_queue, self.result_queue),
-                                                    preprocessor.run(),
-                                                    self.aggregate_queues(),
-                                                    self.send_outputs(),
-                                                    self.prnt()))
+        PreProcessor(self.result_queue, self.preprocess_queue).start()
+        Sentiment(self.preprocess_queue, self.sentiment_queue).start()
+        Thread(target=self.prnt).start()
 
-    async def prnt(self):
+        main_loop.run_until_complete(asyncio.gather(*jobs,
+                                                    download(self.url_queue, self.result_queue),
+                                                    self.aggregate_queues()
+                                                    # self.send_outputs()
+                                                    ))
+
+    def prnt(self):
         while True:
-            item = await self.result_queue.get()
-            print(item)
+            if not self.output_queue.empty():
+                item = self.output_queue.get_nowait()
+                print(item)
+            time.sleep(0.01)
 
 
 if __name__ == '__main__':

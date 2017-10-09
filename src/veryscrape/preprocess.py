@@ -1,8 +1,9 @@
 import os
 import re
+import time
 from collections import defaultdict
 from functools import partial
-from multiprocessing import Process
+from threading import Thread
 from xml.sax.saxutils import unescape
 
 import lxml.etree as etree
@@ -16,7 +17,7 @@ from numpy import array
 from veryscrape.api import Item
 
 
-class PreProcessor(Process):
+class PreProcessor(Thread):
     def __init__(self, input_queue, output_queue):
         super(PreProcessor, self).__init__()
         self.input = input_queue
@@ -67,7 +68,7 @@ class PreProcessor(Process):
             top_node = self.extractor.post_cleanup(self.extractor.calculate_best_node(clean_doc))
             content, _ = self.formatter.get_formatted(top_node)
             return Item(content, item.topic, item.source)
-        except etree.XMLSyntaxError:
+        except (etree.XMLSyntaxError, AttributeError):
             pass
         except Exception as e:
             print('PreProcess', repr(e))
@@ -105,5 +106,6 @@ class PreProcessor(Process):
             if not self.input.empty():
                 item = self.input.get_nowait()
                 item = self.clean_item(item)
-                if item.content != 'failed' and item.topic and item.source:
+                if not isinstance(item.content, str) and item.topic and item.source:
                     self.output.put(item)
+            time.sleep(0.001)

@@ -24,7 +24,7 @@ class Twitter(BaseScraper):
         setup = partial(self.build_request, 'POST', 'statuses/filter.json', oauth=1, params=params, use_proxy=use_proxy)
         return setup
 
-    async def handle_response(self, resp, topic, queue, stream_for=100000000):
+    async def handle_response(self, resp, topic, queue, stream_for=100000000, **kwargs):
         start = time.time()
         if resp.status == 420:
             await asyncio.sleep(self.retry_420)
@@ -141,7 +141,7 @@ class Google(BaseScraper):
 
 class Finance(BaseScraper):
     base_url = 'http://www.google.com/'
-    proxy_params = {'speed': 50, 'https': 1}
+    proxy_params = {'https': 1, 'user_agent': 1, 'post': 1, 'allowsCookies': 1}
 
     def setup(self, query, use_proxy=False):
         setup = partial(self.build_request, 'GET', 'finance?', params={'q': query}, use_proxy=use_proxy)
@@ -157,5 +157,5 @@ class Finance(BaseScraper):
         tmp = re.search(r'id="ref_(.*?)">(.*?)<', res)
         if tmp:
             stock_price = eval(tmp.group(2).replace(',', ''))
-        item = Item(stock_price, topic, 'article')
+        item = Item(stock_price, topic, 'stock')
         await queue.put(item)

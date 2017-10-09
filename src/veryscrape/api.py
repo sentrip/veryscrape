@@ -44,7 +44,7 @@ class BaseScraper:
         """Overwrite with setup for scrape, return functools.partial of build_requests with appropriate arguments"""
         return lambda: partial(asyncio.sleep, 1)
 
-    def handle_response(self, resp, topic, queue):
+    def handle_response(self, resp, topic, queue, **kwargs):
         """Overwrite with response handling for scrape - response needs to be awaited (e.g. await resp.text())"""
         pass
 
