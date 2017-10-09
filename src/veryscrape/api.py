@@ -18,47 +18,10 @@ Item = namedtuple('Item', ['content', 'topic', 'source'])
 Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
 
 
-async def get_auth(auth_type):
-    """Requests api server for corresponding authentication information"""
+class BaseScraper:
+    # Proxy & api data servers
+    proxy_url = 'http://192.168.0.100:9999'
     api_url = 'http://192.168.0.100:1111'
-    async with aiohttp.ClientSession() as sess:
-        async with sess.get(api_url, params={'q': auth_type}) as response:
-            resp = await response.text()
-    try:
-        return eval(resp)
-    except (KeyError, TypeError):
-        return []
-
-
-@retry(stop_max_attempt_number=5, wait_exponential_multiplier=1000, wait_jitter_max=500)
-async def fetch(url, session):
-    try:
-        async with session.get(url) as raw:
-            enc_search = re.search('charset=(?P<enc>\S*)', raw.headers.get('content-type', default=''))
-            encoding = enc_search.group('enc') if enc_search else 'UTF-8'
-            return await raw.text(encoding=encoding, errors='ignore')
-    except (aiohttp.ClientError, aiohttp.ServerDisconnectedError):
-        return None
-
-
-async def download(url_queue, result_queue, duration=0):
-    jobs = []
-    start = time.time()
-    sess = aiohttp.ClientSession()
-    while not duration or time.time() - start < duration or not url_queue.empty:
-        if len(jobs) >= 100 or url_queue.empty():
-            responses = await asyncio.gather(*jobs)
-            for resp in responses:
-                if resp is not None:
-                    new_item = Item(resp, item.topic, item.source)
-                    await result_queue.put(new_item)
-            jobs = []
-        item = await url_queue.get()
-        jobs.append(fetch(item.content, sess))
-    await sess.close()
-
-
-class RequestBuilder:
     # Base request characteristics
     base_url = 'http://example.com'
     user_agent = None
@@ -73,8 +36,6 @@ class RequestBuilder:
     rate_limit = 0  # Requests per minute
     request_count = 0
     last_removed = time.clock()
-    # Proxy server
-    proxy_url = 'http://192.168.0.100:9999'
     proxy_params, proxy = None, None
     # Unique item filtering
     seen = set()
@@ -168,11 +129,14 @@ class RequestBuilder:
     async def update_proxy(self):
         """Updates current proxy with a proxy that has the characteristics specified in params"""
         if self.proxy_params is not None:
-            async with aiohttp.ClientSession() as sess:
-                async with sess.get(self.proxy_url, params=self.proxy_params) as resp:
-                    res = await resp.text()
-            if not res.startswith('Incorrect'):
+            res = await self.get_from_local_server(self.proxy_url, self.proxy_params)
+            if res is not None:
                 self.proxy = res
+
+    async def get_api_data(self, q):
+        """Queries local api data server for data type specified by q"""
+        res = await self.get_from_local_server(self.api_url, {'q': q})
+        return eval(res)
 
     @staticmethod
     def clean_urls(urls):
@@ -184,6 +148,15 @@ class RequestBuilder:
             is_not_relevant = any(j in u for j in false_urls)
             if u.startswith('http') and not (is_root_url or is_not_relevant):
                 yield u
+
+    @staticmethod
+    async def get_from_local_server(url, params):
+        """Gets from the local server specified in client setup"""
+        async with aiohttp.ClientSession() as sess:
+            async with sess.get(url, params=params) as resp:
+                res = await resp.text()
+        if not res.startswith('Incorrect'):
+            return res
 
     def filter(self, item):
         """Returns False if the item has been seen before, True if not"""

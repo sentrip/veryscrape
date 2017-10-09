@@ -1,4 +1,4 @@
-# todo write tests for scrape!
+# todo write tests for extensions!
 # if __name__ == '__main__':
 #     import asyncio
 #     from veryscrape.request import get_auth

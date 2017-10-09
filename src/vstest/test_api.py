@@ -5,38 +5,15 @@ import unittest
 from collections import namedtuple
 from io import BytesIO
 
-from veryscrape.request import get_auth, RequestBuilder, ReadBuffer
+from veryscrape.api import BaseScraper, ReadBuffer
 from vstest import synchronous
 
 
-class TestRequestBasicFunctions(unittest.TestCase):
-
-    @synchronous
-    async def test_get_auth(self):
-        types = ['twingly', 'reddit', 'twitter']
-        auths = await asyncio.gather(*[get_auth(t) for t in types])
-        for auth in auths:
-            assert isinstance(auth, list) or isinstance(auth, str), 'Incorrect auth data type returned!, {}'.format(type(auth))
-            assert len(auth) >= 1, 'No authentications returned, {}'.format(auth)
-
-    @synchronous
-    async def test_fetch(self):
-        """Tests the simple http fetch method"""
-        # todo implement test
-        pass
-
-    @synchronous
-    async def test_download(self):
-        """Tests continuous download coroutine to ensure urls are being downloaded"""
-        # todo implement test
-        pass
-
-
-class TestRequestBuilder(unittest.TestCase):
+class TestBaseScraper(unittest.TestCase):
 
     @synchronous
     async def setUp(self):
-        self.builder = RequestBuilder()
+        self.builder = BaseScraper()
         self.builder.token_url = 'https://www.reddit.com/api/v1/access_token'
 
     @synchronous
@@ -111,22 +88,32 @@ class TestRequestBuilder(unittest.TestCase):
             'Incorrect headers returned'
 
     @synchronous
+    async def test_get_api_data(self):
+        b = BaseScraper()
+        types = ['twingly', 'reddit', 'twitter', 'proxy', 'topics', 'subreddits']
+        auths = await asyncio.gather(*[b.get_api_data(t) for t in types])
+        for auth in auths:
+            assert any(isinstance(auth, i) for i in [list, str, dict]), \
+                'Incorrect auth data type returned!, {}'.format(type(auth))
+            assert len(auth) >= 1, 'No authentications returned, {}'.format(auth)
+
+    @synchronous
     async def test_clean_urls(self):
         """Tests whether the url sanitizing generator correctly removes bad urls"""
-        # todo implement test
-        pass
+        urls = ['https://google.com', '/path/to/some.shit', 'http://youtube.com']
+        clean = ['http://somespecialthing.io/articlestuff', 'http://quenetasd.io/articlestuff']
+        urls += clean
+        b = BaseScraper()
+        clean_urls = [i for i in b.clean_urls(urls)]
+        assert clean == clean_urls, 'Did not correctly remove junk urls!'
 
     @synchronous
     async def test_filter(self):
-        """Tests whether the unique filter is correcly able to remove all duplicates"""
-        # todo implement test
-        pass
-
-    @synchronous
-    async def test_scrape(self):
-        """Tests whether the scrape function correctly handles an http request and response"""
-        # todo implement test
-        pass
+        """Tests whether the unique filter is correctly able to remove all duplicates"""
+        alls = ['abc', 'adc', 'gbc', 'abc']
+        b = BaseScraper()
+        uniques = [i for i in alls if b.filter(i)]
+        assert len(uniques) == 3, 'Filter did not correctly remove the duplicate from the list!'
 
 
 class TestReadBuffer(unittest.TestCase):

@@ -13,7 +13,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import wordpunct_tokenize
 from numpy import array
 
-from veryscrape.request import Item
+from veryscrape.api import Item
 
 
 class PreProcessor(Process):

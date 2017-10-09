@@ -7,9 +7,9 @@ from threading import Thread
 import numpy as np
 import tensorflow as tf
 
-from veryscrape.producer import load_query_dictionary
-from veryscrape.request import Item
+from veryscrape.api import Item
 from veryscrape.sentiment_model import Model
+from veryscrape.stream import get_topics
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -62,7 +62,7 @@ class SentimentAverage(Thread):
         self.input = input_queue
         self.output = output_queue
         self.types = ['reddit', 'twitter', 'article', 'blog']
-        self.topics = sorted(list(load_query_dictionary('query_topics')))
+        self.topics = sorted(list(get_topics('topics').keys()))
         self.current_sentiments = {t: {q: [] for q in self.types} for t in self.topics}
         self.last_sentiments = {t: {q: 0. for q in self.types} for t in self.topics}
 

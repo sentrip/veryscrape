@@ -1,61 +1,15 @@
 import asyncio
-import random
 import re
-import ssl
 import time
 from functools import partial
 
-import aiohttp
 import lxml.html as html
 from twingly_search.parser import Parser
 
-from veryscrape.request import RequestBuilder, ReadBuffer, Item
+from veryscrape.api import BaseScraper, ReadBuffer, Item
 
 
-def scrape_handler(ex):
-    allowed = [ConnectionError, aiohttp.ClientError, aiohttp.ServerDisconnectedError, ssl.CertificateError]
-    for a_ex in allowed:
-        if isinstance(ex, a_ex):
-            return
-    else:
-        print(repr(ex))
-
-
-def circuit_broken(n=5, reset=10, ex_handler=lambda ex: print(repr(ex))):
-    def outer_wrapper(f):
-        async def inner_wrapper(*args, **kwargs):
-            offset = reset * random.random() * 0.2
-            last_fail = 0.
-            count = 0
-            while True:
-                await asyncio.sleep(0)
-                if count < n:
-                    try:
-                        await f(*args, **kwargs)
-                        count = 0
-                    except Exception as e:
-                        ex_handler(e)
-                        count += 1
-                        last_fail = time.time()
-                elif count >= n and time.time() - last_fail > reset + offset:
-                    count -= 1
-        return inner_wrapper
-    return outer_wrapper
-
-
-class InfiniteScraper:
-    def __init__(self, cls, *args, **kwargs):
-        self.cls = cls(*args, **kwargs)
-
-    @circuit_broken(n=5, reset=30, ex_handler=scrape_handler)
-    async def scrape_forever(self, start_delay, repeat_every, *args, **kwargs):
-        start = time.time()
-        await asyncio.sleep(start_delay)
-        await self.cls.scrape(*args, **kwargs)
-        await asyncio.sleep(max(0, repeat_every - (time.time() - start)))
-
-
-class Twitter(RequestBuilder):
+class Twitter(BaseScraper):
     base_url = 'https://stream.twitter.com/1.1/'
     proxy_params = {'speed': 30, 'https': 1, 'post': 1}
     # Rate limits
@@ -84,7 +38,7 @@ class Twitter(RequestBuilder):
             await asyncio.sleep(self.snooze_time)
 
 
-class Reddit(RequestBuilder):
+class Reddit(BaseScraper):
     base_url = 'https://oauth.reddit.com/r/'
     token_url = 'https://www.reddit.com/api/v1/access_token'
     token_expiry = time.time() - 5
@@ -129,7 +83,7 @@ class Reddit(RequestBuilder):
             await self.scrape(link, topic, queue, setup=self.setup_comments, resp_handler=self.handle_comments)
 
 
-class Twingly(RequestBuilder):
+class Twingly(BaseScraper):
     base_url = "https://api.twingly.com/"
     rate_limit = 60
 
@@ -156,7 +110,7 @@ class Twingly(RequestBuilder):
                 await queue.put(item)
 
 
-class Google(RequestBuilder):
+class Google(BaseScraper):
     base_url = 'https://news.google.com/news/search/section/q'
     proxy_params = {'speed': 50, 'https': 1}
     rate_limit = 120
@@ -182,7 +136,7 @@ class Google(RequestBuilder):
                 await queue.put(item)
 
 
-class Finance(RequestBuilder):
+class Finance(BaseScraper):
     base_url = 'http://www.google.com/'
     proxy_params = {'speed': 50, 'https': 1}
 
