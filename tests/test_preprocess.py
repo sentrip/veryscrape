@@ -2,13 +2,10 @@ import os
 import random
 import re
 import unittest
-from collections import defaultdict
 from multiprocessing import Queue
 
-import numpy as np
-
-from veryscrape.api import Item
-from veryscrape.preprocess import PreProcessor
+from api import Item
+from preprocess import PreProcessor
 
 
 def load_data(pth):
@@ -28,24 +25,17 @@ def load_data(pth):
 
 
 class TestPreProcess(unittest.TestCase):
-    current = os.getcwd()[:os.getcwd().find('src')] + 'src/vstest/'
+
     input_queue = Queue()
     output_queue = Queue()
     client = PreProcessor(input_queue, output_queue)
-    client.vocab = client.load_vocab()
-    tweets, comments, htmls = load_data(current + 'data')
+    tweets, comments, htmls = load_data(os.getcwd() + '/data')
 
     def tearDown(self):
         while not self.input_queue.empty():
             _ = self.input_queue.get()
         while not self.output_queue.empty():
             _ = self.output_queue.get()
-
-    def test_load_vocab(self):
-        v = self.client.load_vocab()
-        assert isinstance(v, defaultdict), "Incorrect dictionary format returned"
-        assert len(v) == 250000, 'Vocab of incorrect length'
-        assert v['</s>'] == 0, 'Vocab not correctly loaded'
 
     def test_clean_tweet(self):
         """Test string cleaning for tweets"""
@@ -83,10 +73,3 @@ class TestPreProcess(unittest.TestCase):
                 'Item has unnormalized new lines, {}'.format(i.content)
             assert ('http:' not in i.content and 'https:' not in i.content), \
                 'Item has an uncleaned link! {}'.format(i.content)
-
-    def test_feature_convert(self):
-        """Test string conversion to feature vector"""
-        sent = 'hello this is my sentence, i would like to test the feature conversion! please give me a good matrix.'
-        item = self.client.feature_convert(Item(sent, '', ''))
-        assert item.content.shape == (150, ), "Incorrect shape of features returned, {}".format(item.content.shape)
-        assert np.sum(np.sum(item.content, axis=0)) > 0, 'No words were found'
