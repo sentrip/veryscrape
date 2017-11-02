@@ -1,11 +1,15 @@
 import json
+import logging
 import time
 import unittest
 from collections import namedtuple
 from io import BytesIO
 
-from tests import synchronous
+from tests import synchronous, LOG_LEVEL
 from veryscrape.api import BaseScraper, ReadBuffer
+
+log = logging.getLogger(__name__)
+logging.basicConfig(level=LOG_LEVEL)
 
 
 class TestBaseScraper(unittest.TestCase):
@@ -33,16 +37,6 @@ class TestBaseScraper(unittest.TestCase):
         self.builder.update_rate_limit()
         assert self.builder.request_count <= 100 - 43, \
             "Request count was not decremented correctly, {}, {}".format(self.builder.request_count, 100 - 43)
-
-    # @synchronous
-    # async def test_get_api_data(self):
-    #     b = BaseScraper()
-    #     types = ['twingly', 'reddit', 'twitter', 'proxy', 'topics', 'subreddits']
-    #     auths = await asyncio.gather(*[b.get_api_data(t) for t in types])
-    #     for auth in auths:
-    #         assert any(isinstance(auth, i) for i in [list, str, dict]), \
-    #             'Incorrect auth data type returned!, {}'.format(type(auth))
-    #         assert len(auth) >= 1, 'No authentications returned, {}'.format(auth)
 
     @synchronous
     async def test_update_proxy_no_proxy_required(self):

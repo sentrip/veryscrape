@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import re
@@ -6,6 +7,10 @@ from multiprocessing import Queue
 
 from api import Item
 from preprocess import PreProcessor
+from tests import LOG_LEVEL
+
+log = logging.getLogger(__name__)
+logging.basicConfig(level=LOG_LEVEL)
 
 
 def load_data(pth):

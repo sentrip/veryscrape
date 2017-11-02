@@ -1,18 +1,20 @@
 import asyncio
 import json
+import logging
 import re
 import time
 from collections import namedtuple
 from functools import partial
 from hashlib import sha1, md5
 from random import SystemRandom
-from urllib.parse import urljoin
+from urllib.parse import urljoin, quote
 
 import aiohttp
 from aioauth_client import HmacSha1Signature
 from fake_useragent import UserAgent
 from retrying import retry
 
+log = logging.getLogger(__name__)
 random = SystemRandom().random
 Item = namedtuple('Item', ['content', 'topic', 'source'])
 Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source, re.sub(r'[\n\r\t]', '', str(s.content)[:15]))
@@ -20,7 +22,7 @@ Item.__repr__ = lambda s: "Item({:5s}, {:7s}, {:15s})".format(s.topic, s.source,
 
 class BaseScraper:
     # Proxy & api data servers
-    proxy_url = 'http://192.168.0.104:9999'
+    proxy_url = 'http://192.168.1.46:9999'
     # Base request characteristics
     base_url = 'http://example.com'
     user_agent = None
@@ -80,6 +82,7 @@ class BaseScraper:
             diff = int(since / 60 * self.rate_limit)
             self.request_count = max(0, self.request_count - diff)
             self.last_removed = now if diff else self.last_removed
+            log.debug('Decremented rate limit count by %d', diff)
 
     @property
     def _user_agent(self):
@@ -128,28 +131,16 @@ class BaseScraper:
     async def update_proxy(self):
         """Updates current proxy with a proxy that has the characteristics specified in params"""
         if self.proxy_params is not None:
-                async with aiohttp.ClientSession() as sess:
-                    async with sess.get(self.proxy_url, params=self.proxy_params) as resp:
-                        res = await resp.text()
-                        try:
-                            assert not res.startswith('Error')
-                            self.proxy = res
-                        except AssertionError:
-                            pass
-
-    # @staticmethod
-    # async def get_from_local_server(url, params):
-    #     """Gets from the local server specified in client setup"""
-    #     async with aiohttp.ClientSession() as sess:
-    #         async with sess.get(url, params=params) as resp:
-    #             res = await resp.text()
-    #     if not res.startswith('Error'):
-    #         return res
-
-    # async def get_api_data(self, q):
-    #     """Queries local api data server for data type specified by q"""
-    #     res = await self.get_from_local_server(self.api_url, {'q': q})
-    #     return eval(res)
+            self.proxy_params.update(apiKey='admin')
+            async with aiohttp.ClientSession() as sess:
+                async with sess.get(self.proxy_url, params=self.proxy_params) as resp:
+                    res = await resp.text()
+                    try:
+                        assert not res.startswith('Error')
+                        self.proxy = res
+                        log.debug('Successfully updated proxy to %s', res)
+                    except AssertionError:
+                        log.debug('Did not successfully fetch proxy')
 
     @staticmethod
     def clean_urls(urls):
@@ -161,6 +152,8 @@ class BaseScraper:
             is_not_relevant = any(j in u for j in false_urls)
             if u.startswith('http') and not (is_root_url or is_not_relevant):
                 yield u
+            else:
+                log.debug('Removing unclean url from list: %s', u)
 
     def filter(self, item):
         """Returns False if the item has been seen before, True if not"""
@@ -170,11 +163,13 @@ class BaseScraper:
             if len(self.seen) >= 50000:
                 self.seen.pop()
             return True
+        log.debug('Filtering already seen item: %s', item[:50].replace('\n', ''))
         return False
 
     @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_jitter_max=500)
     async def scrape(self, query, topic, queue, use_proxy=False, setup=None, resp_handler=None, **rh_kwargs):
         """Scrapes resources provided in setup method and handles response with handle_response method"""
+        query = quote(query)
         if setup is None:
             setup = self.setup
         if resp_handler is None:
@@ -182,6 +177,7 @@ class BaseScraper:
         args = [query] + ([use_proxy] if use_proxy else [])
         setup = setup(*args)
         method, url, params, kwargs = await setup()
+        log.debug('Scraping: method=%s, url=%s, params=%s, kwargs=%s', method, url, str(params), str(kwargs))
         async with aiohttp.ClientSession() as sess:
             async with sess.request(method, url, params=params, **kwargs) as raw:
                 await resp_handler(raw, topic, queue, **rh_kwargs)

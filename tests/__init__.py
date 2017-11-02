@@ -1,6 +1,8 @@
 import asyncio
 from functools import wraps
 
+LOG_LEVEL = 'DEBUG'
+
 
 def synchronous(f):
     @wraps(f)

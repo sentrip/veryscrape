@@ -1,8 +1,12 @@
 import asyncio
+import logging
 import unittest
 
-from tests import synchronous
+from tests import synchronous, LOG_LEVEL
 from veryscrape.scrapers import Twingly, Twitter, Reddit, Google
+
+log = logging.getLogger(__name__)
+logging.basicConfig(level=LOG_LEVEL)
 
 
 class TestExtensions(unittest.TestCase):
@@ -53,15 +57,3 @@ class TestExtensions(unittest.TestCase):
         google = Google()
         await google.scrape('whatsapp', 'FB', self.q, use_proxy=True)
         assert self.q.qsize() > 0, 'No items retrieved from google!'
-
-    # @synchronous
-    # async def test_finance_no_proxy(self):
-    #     finance = Finance()
-    #     await finance.scrape('FB', 'FB', self.q)
-    #     assert self.q.qsize() > 0, 'No items retrieved from finance!'
-    #
-    # @synchronous
-    # async def test_finance_proxy(self):
-    #     finance = Finance()
-    #     await finance.scrape('FB', 'FB', self.q, use_proxy=True)
-    #     assert self.q.qsize() > 0, 'No items retrieved from finance!'

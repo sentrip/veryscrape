@@ -1,6 +1,5 @@
+import asyncio
 import re
-import time
-from concurrent.futures import ProcessPoolExecutor
 from xml.sax.saxutils import unescape
 
 import lxml.etree as etree
@@ -78,14 +77,12 @@ class PreProcessor:
 
     def send_item(self, future):
         item = future.result()
-        if not isinstance(item.content, str) and item.topic and item.source:
-            self.output.put(item)
+        if item.topic and item.source:
+            self.output.put_nowait(item)
 
-    def run(self, n_workers=2):
-        pool = ProcessPoolExecutor(n_workers)
+    async def run(self, pool):
+        loop = asyncio.get_event_loop()
         while True:
-            if not self.input.empty():
-                item = self.input.get_nowait()
-                future = pool.submit(self.clean_item, item)
-                future.add_done_callback(self.send_item)
-            time.sleep(0.001)
+            item = await self.input.get()
+            future = loop.run_in_executor(pool, self.clean_item, item)
+            future.add_done_callback(self.send_item)
