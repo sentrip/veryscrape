@@ -39,30 +39,6 @@ class TestBaseScraper(unittest.TestCase):
             "Request count was not decremented correctly, {}, {}".format(self.builder.request_count, 100 - 43)
 
     @synchronous
-    async def test_update_proxy_no_proxy_required(self):
-        """Tests if update proxies does nothing if a proxy already exists"""
-        self.builder.proxy = 'true'
-        await self.builder.update_proxy()
-        assert self.builder.proxy == 'true', \
-            'Proxy was updated when it should not have been, {}'.format(self.builder.proxy)
-
-    @synchronous
-    async def test_update_proxy_proxy_required_no_params(self):
-        """Tests if update proxy correctly updates proxy when required with no proxy parameters"""
-        self.builder.proxy_params = {}
-        await self.builder.update_proxy()
-        assert self.builder.proxy.startswith('http'), \
-            'Proxy was updated when it should not have been, {}'.format(self.builder.proxy)
-
-    @synchronous
-    async def test_update_proxy_proxy_required_params(self):
-        """Tests if update proxy correctly updates proxy when required with proxy parameters"""
-        self.builder.proxy_params = {'speed': 1}
-        await self.builder.update_proxy()
-        assert self.builder.proxy.startswith('http'), \
-            'Proxy was not updated when it should not have been, {}'.format(self.builder.proxy)
-
-    @synchronous
     async def test_update_oauth2_no_token(self):
         """Test oauth2 token retrieval when new token is required"""
         self.builder.client, self.builder.secret = 'VbKYA5v77UPooA', 'OZan8kt5EluEZ0pXpMbmtLoPTgk'
@@ -89,6 +65,30 @@ class TestBaseScraper(unittest.TestCase):
         assert self.builder.token != 'hello', 'Token was not updated when it should have been'
         assert headers == {'Authorization': 'bearer ' + self.builder.token}, \
             'Incorrect headers returned'
+
+    @synchronous
+    async def test_update_proxy_no_proxy_required(self):
+        """Tests if update proxies does nothing if a proxy already exists"""
+        self.builder.proxy = 'true'
+        await self.builder.update_proxy()
+        assert self.builder.proxy == 'true', \
+            'Proxy was updated when it should not have been, {}'.format(self.builder.proxy)
+
+    @synchronous
+    async def test_update_proxy_proxy_required_no_params(self):
+        """Tests if update proxy correctly updates proxy when required with no proxy parameters"""
+        self.builder.proxy_params = {}
+        await self.builder.update_proxy()
+        assert self.builder.proxy.startswith('http'), \
+            'Proxy was updated when it should not have been, {}'.format(self.builder.proxy)
+
+    @synchronous
+    async def test_update_proxy_proxy_required_params(self):
+        """Tests if update proxy correctly updates proxy when required with proxy parameters"""
+        self.builder.proxy_params = {'speed': 1}
+        await self.builder.update_proxy()
+        assert self.builder.proxy.startswith('http'), \
+            'Proxy was not updated when it should not have been, {}'.format(self.builder.proxy)
 
     @synchronous
     async def test_clean_urls(self):

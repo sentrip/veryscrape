@@ -178,7 +178,7 @@ class BaseScraper:
         setup = setup(*args)
         method, url, params, kwargs = await setup()
         log.debug('Scraping: method=%s, url=%s, params=%s, kwargs=%s', method, url, str(params), str(kwargs))
-        async with aiohttp.ClientSession() as sess:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as sess:
             async with sess.request(method, url, params=params, **kwargs) as raw:
                 await resp_handler(raw, topic, queue, **rh_kwargs)
 

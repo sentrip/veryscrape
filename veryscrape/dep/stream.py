@@ -6,9 +6,9 @@ import time
 from collections import defaultdict
 
 import aiohttp
+from api import Item, BaseScraper
 from retrying import retry
 
-from api import Item, BaseScraper
 from tests import synchronous
 
 

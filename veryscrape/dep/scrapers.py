@@ -1,69 +1,62 @@
 import asyncio
-import json
 import logging
 import re
 import time
 
 import aiohttp
 import lxml.html as html
+from api import BaseScraper, ReadBuffer, Item
 from retrying import retry
 from twingly_search.parser import Parser
 
-from request import BaseScraper, Item
-
-log = logging.getLogger('veryscrape')
+log = logging.getLogger(__name__)
 
 
 class Twitter(BaseScraper):
-    def __init__(self, auth, **kwargs):
-        super(Twitter, self).__init__(**kwargs)
+    base_url = 'https://stream.twitter.com/1.1/'
+    proxy_params = {'speed': 30, 'https': 1, 'post': 1, 'anonymity': 2}
+    # Rate limits
+    retry_420 = 60
+    snooze_time = 0.25
+
+    def __init__(self, auth):
         self.client, self.secret, self.token, self.token_secret = auth
-        self.base_url = 'https://stream.twitter.com/1.1/'
-        self.proxy_params = {'speed': 30, 'https': 1, 'post': 1, 'anonymous': 1}
-        # Rate limits
-        self.retry_420 = 60
-        self.snooze_time = 0.25
 
     def setup(self, query):
         params = {'language': 'en', 'track': query}
+        # setup = partial(self.build_request, 'POST', 'statuses/filter.json', oauth=1, params=params)
         return self.build_request('POST', 'statuses/filter.json', oauth=1, params=params)
 
-    async def handle_response(self, resp, topic, break_after=0):
-        print(resp.status)
+    async def handle_response(self, resp, topic, queue, stream_for=100000000, **kwargs):
+        start = time.time()
         if resp.status == 420:
             await asyncio.sleep(self.retry_420)
         elif resp.status != 200:
             raise ConnectionError('Could not connect to twitter: {}'.format(resp.status))
         else:
-            count = 0
-            async for line in resp.content:
-                print(line)
-                if count >= break_after > 0:
+            buffer = ReadBuffer(resp)
+            async for status in buffer:
+                if time.time() - start >= stream_for:
                     break
-                try:
-                    status = json.loads(line.decode('utf-8'))
-                    if self.filter(status['text']):
-                        await self.queue.put(Item(status['text'], topic, 'twitter'))
-                    count += 1
-                except json.JSONDecodeError:
-                    pass
+                if self.filter(status['text']):
+                    item = Item(status['text'], topic, 'twitter')
+                    await queue.put(item)
             await asyncio.sleep(self.snooze_time)
 
 
 class Reddit(BaseScraper):
-    def __init__(self, auth, **kwargs):
-        super(Reddit, self).__init__(**kwargs)
+    base_url = 'https://oauth.reddit.com/r/'
+    token_url = 'https://www.reddit.com/api/v1/access_token'
+    token_expiry = time.time() - 5
+    rate_limit = 60
+    user_agent = 'test app'
+    persist_user_agent = True
+
+    def __init__(self, auth):
         self.client, self.secret = auth
         self.link = '{}/hot.json?raw_json=1&limit=100'
         self.comment_base = '%s/comments/{}.json?raw_json=1&limit=10000&depth=10'
         self.comment = ''
-
-        self.base_url = 'https://oauth.reddit.com/r/'
-        self.token_url = 'https://www.reddit.com/api/v1/access_token'
-        self.token_expiry = time.time() - 5
-        self.rate_limit = 60
-        self.user_agent = 'test app'
-        self.persist_user_agent = True
 
     def setup(self, query):
         self.comment = self.comment_base % query
@@ -71,9 +64,10 @@ class Reddit(BaseScraper):
         return self.build_request('GET', self.link.format(query), oauth=2)
 
     def setup_comments(self, query):
+        # setup = partial(self.build_request, 'GET', self.comment.format(query), oauth=2)
         return self.build_request('GET', self.comment.format(query), oauth=2)
 
-    async def handle_comments(self, resp, topic):
+    async def handle_comments(self, resp, topic, queue, **kwargs):
         if resp.status == 403:
             raise ConnectionError('Could not connect to reddit: {}'.format(resp.status))
         else:
@@ -86,33 +80,28 @@ class Reddit(BaseScraper):
         for c in comments:
             if c['kind'] == 't1' and self.filter(c['data']['body']):
                 item = Item(c['data']['body'], topic, 'reddit')
-                await self.queue.put(item)
+                await queue.put(item)
 
-    async def handle_response(self, resp, topic, break_after=0):
+    async def handle_response(self, resp, topic, queue, **kwargs):
         resp = await resp.json()
-        count = 0
         for i in resp['data']['children']:
             link = i['data']['id']
             try:
-                if count >= break_after > 0:
-                    break
-                await self.scrape(link, topic, setup=self.setup_comments, resp_handler=self.handle_comments)
-                count += 1
+                await self.scrape(link, topic, queue, setup=self.setup_comments, resp_handler=self.handle_comments)
             except aiohttp.ClientError:
                 await asyncio.sleep(0)
 
 
 class Google(BaseScraper):
-    def __init__(self, **kwargs):
-        super(Google, self).__init__(**kwargs)
-        self.base_url = 'https://news.google.com/news/search/section/q/'
-        self.proxy_params = {'speed': 50, 'https': 1, 'anonymity': 2}
-        self.rate_limit = 120
+    base_url = 'https://news.google.com/news/search/section/q/'
+    proxy_params = {'speed': 50, 'https': 1, 'anonymity': 2}
+    rate_limit = 120
 
     def setup(self, query):
+        # setup = partial(self.build_request, 'GET', '{}/{}?hl=en&gl=US&ned=us'.format(query, query))
         return self.build_request('GET', '{}/{}?hl=en&gl=US&ned=us'.format(query, query))
 
-    async def handle_response(self, resp, topic, **kwargs):
+    async def handle_response(self, resp, topic, queue, **kwargs):
         if resp.status != 200:
             raise ConnectionError('Could not connect to google: {}'.format(resp.status))
         else:
@@ -126,7 +115,7 @@ class Google(BaseScraper):
         for url in self.clean_urls(urls):
             if self.filter:
                 item = Item(url, topic, 'article')
-                await self.queue.put(item)
+                await queue.put(item)
 
 
 @retry(stop_max_attempt_number=5, wait_exponential_multiplier=2, wait_jitter_max=500)
@@ -168,17 +157,18 @@ class Twingly(BaseScraper):
     base_url = "https://api.twingly.com/"
     rate_limit = 60
 
-    def __init__(self, auth, **kwargs):
-        super(Twingly, self).__init__(**kwargs)
+    def __init__(self, auth):
         self.client = auth
         self.parser = Parser()
 
     def setup(self, query):
         query_string = "{} lang:en tspan:12h page-size:10000".format(query)
+        # setup = partial(self.build_request, 'GET', 'blog/search/api/v3/search',
+        #                params={'q': query_string, 'apiKey': self.client})
         return self.build_request('GET', 'blog/search/api/v3/search',
                                   params={'q': query_string, 'apiKey': self.client})
 
-    async def handle_response(self, resp, topic, **kwargs):
+    async def handle_response(self, resp, topic, queue, **kwargs):
         if resp.status == 401:
             raise ConnectionError('Could not connect to twingly: {}'.format(resp.status))
         else:
@@ -188,4 +178,4 @@ class Twingly(BaseScraper):
         for url in self.clean_urls(urls):
             if self.filter(url):
                 item = Item(url, topic, 'blog')
-                await self.queue.put(item)
+                await queue.put(item)

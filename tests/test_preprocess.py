@@ -1,13 +1,11 @@
 import logging
 import os
 import random
-import re
 import unittest
 from multiprocessing import Queue
 
-from api import Item
-from preprocess import PreProcessor
 from tests import LOG_LEVEL
+from veryscrape.preprocess import *
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=LOG_LEVEL)
@@ -30,7 +28,6 @@ def load_data(pth):
 
 
 class TestPreProcess(unittest.TestCase):
-
     input_queue = Queue()
     output_queue = Queue()
     client = PreProcessor(input_queue, output_queue)
@@ -49,7 +46,7 @@ class TestPreProcess(unittest.TestCase):
         hash_reg = re.compile('@[a-zA-Z0-9_]{2,}')
 
         for i, tweet in enumerate(random.sample(self.tweets, 10000)):
-            new_tweet = self.client.clean_tweet(Item(tweet, '', '')).content
+            new_tweet = clean_tweet(Item(tweet, '', '')).content
             assert not re.findall(rt_reg, new_tweet), 'RT was not successfully cleaned\n{}, {}'.format(i, tweet)
             assert not re.findall(at_reg, new_tweet), '@ was not successfully cleaned\n{}, {}'.format(i, tweet)
             assert not re.findall(hash_reg, new_tweet), '# was not successfully cleaned\n{}, {}'.format(i, tweet)
@@ -57,23 +54,23 @@ class TestPreProcess(unittest.TestCase):
     def test_clean_reddit(self):
         """Test string cleaning for reddit comments"""
         for cm in self.comments:
-            c = self.client.clean_reddit_comment(Item(cm, '', ''))
+            c = clean_reddit_comment(Item(cm, '', ''))
             assert 'r/' not in c, 'Subreddit was not successfully cleaned, {}'.format(c)
             assert all(j not in c for j in ['[deleted]', '[removed]', '[not found]']), 'Incorrect comment returned!'
 
     def test_clean_article_blog(self):
         """Test string cleaning for articles and blog posts"""
         for h in self.htmls:
-            art = self.client.clean_article(Item(h, '', ''))
+            art = clean_article(Item(h, '', ''))
             assert '</' not in art.content, 'Html was not correctly converted into article!'
 
     def test_clean_general(self):
         """Test string cleaning for general - newline normalization and http link removal"""
-        alls = [self.client.clean_reddit_comment(Item(i, '', '')) for i in self.comments] + \
-              [self.client.clean_tweet(Item(i, '', '')) for i in random.sample(self.tweets, 10000)] + \
-              [self.client.clean_article(Item(i, '', '')) for i in self.htmls]
+        alls = [clean_reddit_comment(Item(i, '', '')) for i in self.comments] + \
+              [clean_tweet(Item(i, '', '')) for i in random.sample(self.tweets, 10000)] + \
+              [clean_article(Item(i, '', '')) for i in self.htmls]
         for q in alls:
-            i = self.client.clean_general(q)
+            i = clean_general(q)
             assert all(j not in i.content for j in ['\n', '\r', '\t']), \
                 'Item has unnormalized new lines, {}'.format(i.content)
             assert ('http:' not in i.content and 'https:' not in i.content), \
