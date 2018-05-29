@@ -123,7 +123,13 @@ class OAuth2:
     @property
     def oauth2_token_expired(self):
         """Returns true if current oauth2 token needs to be refreshed"""
-        return self.token is None or time() >= self.token_expiry and self.token_expiry
+        return (
+            self.token is None
+            or (
+                self.token_expiry
+                and time() >= self.token_expiry
+            )
+        )
 
     async def auth_token(self):
         """

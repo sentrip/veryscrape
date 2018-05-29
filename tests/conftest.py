@@ -34,8 +34,7 @@ _scrape_config = {
     'twitter': {
         'a|b|c|d': {
             'use_proxies': False,
-            'topic1': ['q1', 'q2'],
-            'topic2': ['q1', 'q2']
+            'topic1': ['q1', 'q2']
         }
     },
     'reddit': {

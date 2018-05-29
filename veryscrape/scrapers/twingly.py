@@ -29,4 +29,5 @@ class Twingly(HTMLScraper):
 
     def extract_urls(self, text):
         result = self.parser.parse(text)
-        return tuple(zip(*list((post.url, post.published_at) for post in result.posts)))
+        return tuple(zip(*list((post.url, post.published_at)
+                               for post in result.posts)))

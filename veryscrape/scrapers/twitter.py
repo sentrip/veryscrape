@@ -1,5 +1,4 @@
-from datetime import datetime, timedelta
-import asyncio
+from datetime import datetime
 import json
 
 from ..items import ItemGenerator
@@ -10,7 +9,6 @@ from ..session import OAuth1Session, fetch
 
 class TweetGen(ItemGenerator):
     last_item = None
-    url_replace = r'(http|https):/?/?[\w_-]*(?:\.[\w_-]*)?[\d\w.,@?^=%&:/~+#-]*'
 
     def process_text(self, text):
         try:
@@ -26,8 +24,6 @@ class TweetGen(ItemGenerator):
         if self.last_item is not None:
             return datetime.fromtimestamp(
                 int(self.last_item['timestamp_ms']) / 1000)
-            # tweet_time = datetime.strptime(self.last_item['created_at'], '%a %b %d %H:%M:%S %z %Y')
-            # return tweet_time + timedelta(hours=1)  # convert +0000 to +0001
 
 
 class Twitter(Scraper):
@@ -37,7 +33,9 @@ class Twitter(Scraper):
 
     def __init__(self, key, secret, token, token_secret, *, proxy_pool=None):
         super(Twitter, self).__init__(
-            OAuth1Session, key, secret, token, token_secret, proxy_pool=proxy_pool
+            OAuth1Session,
+            key, secret, token, token_secret,
+            proxy_pool=proxy_pool
         )
         self.client.base_url = 'https://stream.twitter.com/1.1/'
 
@@ -47,4 +45,3 @@ class Twitter(Scraper):
                     stream_func=lambda l: self.queues[topic].put_nowait(l),
                     params={'language': 'en', 'track': query}, **kwargs
                     )
-

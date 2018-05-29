@@ -2,7 +2,6 @@ from xml.sax.saxutils import unescape
 from newspaper import Config, extractors, cleaners, outputformatters
 
 import re
-import lxml.etree as etree
 import lxml.html as html
 
 from .items import Item
@@ -101,4 +100,3 @@ def remove_links(text, remove=set(' )({}[];:')):
         text = text[:ind] + text[i:]
         ind = text.find('http')
     return text
-
