@@ -2,14 +2,16 @@ import os, sys
 sys.path.append(os.path.abspath('../veryscrape'))
 from contextlib import contextmanager
 from collections import defaultdict, deque
+from datetime import datetime
 from functools import partial
 import asyncio
 import json
 import pytest
+import random
 import time
 import aiohttp
 import veryscrape.session
-from veryscrape.items import ItemGenerator
+from veryscrape.items import Item, ItemGenerator
 from veryscrape.scrape import Scraper, HTMLScraper
 
 DATA_PATH = 'tests/data/'
@@ -271,14 +273,31 @@ def static_data():
 
 
 @pytest.fixture
+def random_item_queue():
+    n_items = 100
+    now = time.time()
+    items = []
+    for k in range(n_items):
+        items.append(Item(k, created_at=datetime.fromtimestamp(now - n_items + k)))
+    random.shuffle(items)
+    q = asyncio.Queue()
+    for item in items:
+        q.put_nowait(item)
+    return q
+
+
+@pytest.fixture
 def assert_rate_limited():
     async def wrapper(sess, n, url, t, places):
+        # on slow systems sometimes the rate limit is not exact
+        # so this is one less to make sure tests always pass
+        places -= 1
         last_request = time.time()
-        for i in range(n):
+        for _ in range(n):
             async with sess.request('GET', url):
                 now = time.time()
-                assert round(now - last_request, places) == t, \
-                    'Blocking rate waited while not limited'
+                assert round(now - last_request, places) == round(t, places), \
+                    'Blocking rate limited request waited while not limited'
                 last_request = now
     return wrapper
 

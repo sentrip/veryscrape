@@ -1,8 +1,10 @@
+from datetime import datetime
+from hashlib import md5
+from heapq import heappush, heappop
 import asyncio
 import logging
 import re
-from datetime import datetime
-from hashlib import md5
+import time
 
 log = logging.getLogger(__name__)
 
@@ -110,4 +112,36 @@ class ItemMerger:
         self.merge_future.cancel()
 
 
-# todo: add TimeOrderedItems
+class TimeOrderedItems:
+    def __init__(self, q, max_items=None, max_age=None):
+        self.q = q
+        self.max_items = max_items or 100
+        self.max_age = max_age or 3600
+        self.cancelled = False
+        self._heap = []
+
+    def cancel(self):
+        self.cancelled = True
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        while True:
+            if self.cancelled:
+                raise StopAsyncIteration
+            while True:
+                try:
+                    item = self.q.get_nowait()
+                except asyncio.QueueEmpty:
+                    await asyncio.sleep(0)
+                    break
+                else:
+                    heappush(self._heap, (item.created_at.timestamp(), item))
+                    await asyncio.sleep(0)
+
+            if (
+                len(self._heap) > self.max_items
+                or time.time() - self._heap[0][0] > self.max_age
+            ):
+                return heappop(self._heap)[1]

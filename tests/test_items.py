@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from veryscrape.items import ItemGenerator, ItemMerger
+from veryscrape.items import ItemGenerator, ItemMerger, TimeOrderedItems
 
 
 @pytest.mark.asyncio
@@ -97,3 +97,30 @@ async def test_item_merger_cancelled():
     # Now it should fail even though there's an item
     with pytest.raises(StopAsyncIteration):
         await items.__anext__()
+
+
+@pytest.mark.asyncio
+async def test_time_ordered_items_amount(random_item_queue):
+    ordered = TimeOrderedItems(random_item_queue, max_items=50)
+    last, count = 0, 0
+    async for item in ordered:
+        current = item.created_at.timestamp()
+        assert current > last, 'Did not return items ordered by time'
+        last = current
+        count += 1
+        if count >= 50:
+            ordered.cancel()
+
+
+@pytest.mark.asyncio
+async def test_time_ordered_items_age(random_item_queue):
+    ordered = TimeOrderedItems(random_item_queue, max_age=50)
+    last, count = 0, 0
+    async for item in ordered:
+        current = item.created_at.timestamp()
+        assert current > last, 'Did not return items ordered by time'
+        last = current
+        count += 1
+        if count >= 50:
+            ordered.cancel()
+
