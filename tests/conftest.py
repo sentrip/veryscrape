@@ -12,7 +12,7 @@ import time
 import aiohttp
 import veryscrape.session
 from veryscrape.items import Item, ItemGenerator
-from veryscrape.scrape import Scraper, HTMLScraper
+from veryscrape.scrape import Scraper, SearchEngineScraper
 
 DATA_PATH = 'tests/data/'
 
@@ -220,7 +220,7 @@ class TestGen(ItemGenerator):
         return text[1]
 
 
-class TestHTMLScraper(HTMLScraper):
+class TestHTMLScraper(SearchEngineScraper):
     calls = []
     item_gen = TestGen
 

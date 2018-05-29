@@ -1,7 +1,7 @@
 from lxml import html
 
 from ..session import Session
-from ..scrape import HTMLScraper, ItemGenerator
+from ..scrape import SearchEngineScraper, ItemGenerator
 
 
 class ArticleGen(ItemGenerator):
@@ -12,7 +12,7 @@ class ArticleGen(ItemGenerator):
         return text[1]
 
 
-class Google(HTMLScraper):
+class Google(SearchEngineScraper):
     source = 'article'
     item_gen = ArticleGen
 

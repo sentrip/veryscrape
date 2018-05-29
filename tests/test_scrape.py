@@ -1,5 +1,5 @@
 import pytest
-from veryscrape.scrape import HTMLScraper
+from veryscrape.scrape import SearchEngineScraper
 
 
 @pytest.mark.asyncio
@@ -58,7 +58,7 @@ def test_clean_urls():
         'http://blogger.something.com/article.html',
         'http://theonlycorrectone.com/article.html'
     ]
-    for url in HTMLScraper.clean_urls(urls):
+    for url in SearchEngineScraper.clean_urls(urls):
         assert url == 'http://theonlycorrectone.com/article.html', \
             'Did not remove useless urls'
 

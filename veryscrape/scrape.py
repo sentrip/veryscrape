@@ -47,7 +47,7 @@ class Scraper(ABC):
         await self.client.close()
 
 
-class HTMLScraper(Scraper):
+class SearchEngineScraper(Scraper):
     bad_domains = {'.com/', '.org/', '.edu/', '.gov/', '.net/', '.biz/'}
     false_urls = {'google.', 'blogger.', 'youtube.', 'googlenewsblog.'}
 
@@ -66,8 +66,8 @@ class HTMLScraper(Scraper):
         from an iterable of urls
         """
         for u in urls:
-            is_root_url = any(u.endswith(j) for j in HTMLScraper.bad_domains)
-            is_not_relevant = any(j in u for j in HTMLScraper.false_urls)
+            is_root_url = any(u.endswith(j) for j in SearchEngineScraper.bad_domains)
+            is_not_relevant = any(j in u for j in SearchEngineScraper.false_urls)
             if u.startswith('http') and not (is_root_url or is_not_relevant):
                 yield u
             else:

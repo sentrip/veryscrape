@@ -2,7 +2,7 @@ from urllib.parse import quote
 from twingly_search import Parser
 
 from ..session import Session
-from ..scrape import HTMLScraper, ItemGenerator
+from ..scrape import SearchEngineScraper, ItemGenerator
 
 
 class BlogGen(ItemGenerator):
@@ -13,7 +13,7 @@ class BlogGen(ItemGenerator):
         return text[1]
 
 
-class Twingly(HTMLScraper):
+class Twingly(SearchEngineScraper):
     source = 'blog'
     item_gen = BlogGen
 
