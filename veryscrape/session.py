@@ -15,8 +15,8 @@ import re
 log = logging.getLogger(__name__)
 random = SystemRandom().random
 # If fake_useragent can't connect then this allows it to finish early
-settings.HTTP_TIMEOUT = 0
-settings.HTTP_RETRIES = 0
+settings.HTTP_DELAY = 0.01
+settings.HTTP_RETRIES = 1
 try:
     _agent_factory = UserAgent()
 except FakeUserAgentError:  # pragma: nocover

@@ -66,9 +66,9 @@ class SearchEngineScraper(Scraper):
         from an iterable of urls
         """
         for u in urls:
-            is_root_url = any(u.endswith(j) for j in SearchEngineScraper.bad_domains)
-            is_not_relevant = any(j in u for j in SearchEngineScraper.false_urls)
-            if u.startswith('http') and not (is_root_url or is_not_relevant):
+            root_url = any(map(u.endswith, SearchEngineScraper.bad_domains))
+            not_relevant = any(j in u for j in SearchEngineScraper.false_urls)
+            if u.startswith('http') and not (root_url or not_relevant):
                 yield u
             else:
                 log.debug('Removing unclean url: %s', u)
