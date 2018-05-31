@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 
 from ..items import ItemGenerator
-from ..process import remove_links
+from ..process import remove_urls
 from ..scrape import Scraper
 from ..session import OAuth1Session, fetch
 
@@ -14,7 +14,7 @@ class TweetGen(ItemGenerator):
         try:
             self.last_item = json.loads(text.decode('utf-8'))
             text = self.last_item['text']
-            return remove_links(text)
+            return remove_urls(text)
         except (ValueError, KeyError):
             return
 

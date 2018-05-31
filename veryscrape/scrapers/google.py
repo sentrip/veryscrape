@@ -1,5 +1,4 @@
-from lxml import html
-
+from ..process import extract_urls
 from ..session import Session
 from ..scrape import SearchEngineScraper, ItemGenerator
 
@@ -24,9 +23,5 @@ class Google(SearchEngineScraper):
                '{}/{}?hl=en&gl=US&ned=us'.format(query, query)
 
     def extract_urls(self, text):
-        urls = set()
-        result = html.fromstring(text)
-        for e in result.xpath('//*[@href]'):
-            if e.get('href') is not None:
-                urls.add(e.get('href'))
+        urls = extract_urls(text)
         return urls, [None] * len(urls)
