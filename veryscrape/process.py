@@ -1,10 +1,50 @@
+from collections import defaultdict, Counter
+from newspaper import fulltext
 from xml.sax.saxutils import unescape
-from newspaper import Config, extractors, cleaners, outputformatters
-
+import lxml.html
 import re
-import lxml.html as html
+import threading
 
 from .items import Item
+
+_clean_functions = defaultdict(list)
+_mutex = threading.Lock()
+
+
+def register(name, *funcs):
+    """
+    Register cleaning function so it is run automatically
+    on items with source 'name'
+    :param name: name of data source (e.g. 'twitter')
+    :param funcs: cleaning functions to apply
+    """
+    with _mutex:
+        _clean_functions[name].extend(funcs)
+
+
+def unregister(name, *funcs):
+    """
+    Unregister a function registered with 'veryscrape.process.register'
+    :param name: name of data source (e.g. 'twitter')
+    :param funcs: cleaning functions to remove
+    """
+    with _mutex:
+        if name == '*':
+            _clean_functions.clear()
+        elif not funcs:
+            del _clean_functions[name]
+        else:
+            for func in funcs:
+                _clean_functions[name].remove(func)
+
+
+def clean_article(content):
+    """Converts html text into article text"""
+    result = ''
+    try:
+        result = fulltext(content)
+    finally:  # Catch-all to ensure all broken html is discarded
+        return result
 
 
 def clean_tweet(content):
@@ -34,26 +74,6 @@ def clean_reddit_comment(content):
     return content
 
 
-def clean_article(content):
-    """Converts html text into article text"""
-    # Html to article conversion with newspaper setup
-    config = Config()
-    config.language = 'en'
-    config.keep_article_html = False
-    extractor = extractors.ContentExtractor(config)
-    cleaner = cleaners.DocumentCleaner(config)
-    formatter = outputformatters.OutputFormatter(config)
-    try:
-        clean_doc = cleaner.clean(html.fromstring(content))
-        top_node = extractor.post_cleanup(
-            extractor.calculate_best_node(clean_doc))
-        content, _ = formatter.get_formatted(top_node)
-        return content
-    # Catch-all to ensure ALL broken html is discarded
-    except:  # noqa
-        return ''
-
-
 def clean_general(content):
     """
     Remove any urls, non-ascii text and redundant spaces, normalize swearwords
@@ -73,22 +93,62 @@ def clean_general(content):
     return content
 
 
-clean_functions = {
-    'reddit': clean_reddit_comment,
-    'twitter': clean_tweet,
-    'blog': clean_article,
-    'article': clean_article
-}
-
-
 def clean_item(item):
-    content = clean_functions[item.source](item.content)
-    content = clean_general(content)
+    """
+    Clean an item of undesirable data
+    :param item: item to clean with all functions registered to item.source
+    :return: cleaned item
+    """
+    content = item.content
+    for func in _clean_functions[item.source]:
+        content = func(content)
     return Item(content, topic=item.topic,
                 source=item.source, created_at=item.created_at)
 
 
-def remove_links(text, remove=set(' )({}[];:')):
+def classify_text(text, topic_query_dict):
+    """
+    Attempts to classify a text based on query strings organized by topic
+    (Note, this is meant to be very fast - for a web spider)
+    :param text: text to classify
+    :param topic_query_dict: dict of topics and queries:
+        e.g. {'t1': ['q1', 'q2'], 't2': ['q3'], ...
+    :return: which topic does the text belong to
+    """
+    count = Counter(re.split(r'[^\w]', text.lower()))
+    topic = ''
+    max_count = 0
+    for t, queries in topic_query_dict.items():
+        c = sum(count[q] for q in queries)
+        if c > max_count:
+            max_count = c
+            topic = t
+    return topic
+
+
+def extract_urls(text):
+    """
+    Extract urls in a given text and return the urls
+    :param text: text to extract urls from
+    :return: set of urls
+    """
+    urls = set()
+    try:
+        result = lxml.html.fromstring(text)
+        for e in result.xpath('//*[@href]'):
+            if e.get('href') is not None:
+                urls.add(e.get('href'))
+    finally:
+        return urls
+
+
+def remove_urls(text, remove=set(' )({}[];:')):
+    """
+    Removes (without returning) all urls present in a text
+    :param text: text to clean urls from
+    :param remove: break characters for url
+    :return: text clean of urls
+    """
     ind = text.find('http')
     while ind > -1:
         length = len(text)
@@ -100,3 +160,16 @@ def remove_links(text, remove=set(' )({}[];:')):
         text = text[:ind] + text[i:]
         ind = text.find('http')
     return text
+
+
+register('twitter', clean_tweet, clean_general)
+register('reddit', clean_reddit_comment, clean_general)
+register('article', clean_article, clean_general)
+register('blog', clean_article, clean_general)
+register('spider', clean_article, clean_general)
+
+__all__ = [
+    'clean_article', 'clean_tweet', 'clean_reddit_comment', 'clean_general',
+    'clean_item', 'register', 'unregister',
+    'classify_text', 'extract_urls', 'remove_urls'
+]

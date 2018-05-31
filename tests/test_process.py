@@ -1,9 +1,9 @@
+import pytest
 import re
 import random
 
 from veryscrape.items import Item
-from veryscrape.process import remove_links, \
-    clean_article, clean_reddit_comment, clean_tweet, clean_item
+from veryscrape.process import *
 
 # size of data used for tests makes using parametrize too slow
 
@@ -11,7 +11,7 @@ from veryscrape.process import remove_links, \
 def test_remove_links(static_data):
     url_lines = static_data('url_lines')
     for url_line in url_lines:
-        clean = remove_links(url_line)
+        clean = remove_urls(url_line)
         assert 'http' not in clean, \
             'FAIL: \n\toriginal: %s \n\tcleaned: %s\n' % (url_line, clean)
 
@@ -40,6 +40,8 @@ def test_clean_reddit(static_data):
         assert all(j not in c for j in ['[deleted]', '[removed]', '[not found]']), 'Incorrect comment returned!'
 
 
+# Ignore DeprecationWarning caused by newspaper library
+@pytest.mark.filterwarnings('ignore::DeprecationWarning')
 def test_clean_article_blog(static_data):
     """Test string cleaning for articles and blog posts"""
     htmls = static_data('htmls')
@@ -62,3 +64,42 @@ def test_clean_item(static_data):
             'Item has unnormalized new lines, {}'.format(res)
         assert ('http:' not in res and 'https:' not in res), \
             'Item has an uncleaned link! {}'.format(res)
+
+
+def test_classify_text():
+    text = 'apple apple microsoft apple microsoft'
+    result = classify_text(text, {'AAPL': ['apple'], 'MS': ['microsoft']})
+    assert result == 'AAPL', 'Did not correctly classify text'
+
+
+def test_register():
+    register('test1', lambda t: t.replace('1', '2'))
+    result = clean_item(Item('aa1a1a1', source='test1'))
+    assert result.content == 'aa2a2a2', 'Did not use correct clean function'
+
+
+def test_unregister():
+    unregister('twitter', clean_general)
+    text = '#stuffandthings hi my name is !@#$#@!@#$'
+    item = Item(text, source='twitter')
+    result = clean_item(item)
+    assert result.content == ' stuffandthings  hi my name is !@#$#@!@#$', \
+        'Incorrectly cleaned result'
+
+    unregister('twitter')
+    result = clean_item(item)
+    assert result.content == text, 'Incorrectly cleaned result'
+
+    unregister('*')
+    item.source = 'article'
+    result = clean_item(item)
+    assert result.content == text, \
+        'Applied cleaning functions after global de-register'
+
+
+def test_custom_clean_func():
+    import veryscrape.process
+    veryscrape.process.register('custom', lambda s: s.replace('@123@ ', ''))
+    item = Item('data @123@ data', '', 'custom')
+    cleaned = veryscrape.process.clean_item(item)
+    assert cleaned.content == 'data data', 'Did not clean custom item correctly'
