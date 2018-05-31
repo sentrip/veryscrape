@@ -1,37 +1,33 @@
+from functools import partial
 import pytest
-
 from veryscrape.scrapers import *
 
+SCRAPERS = [
+    partial(Twitter, '', '', '', ''),
+    partial(Reddit, '', ''),
+    partial(Twingly, ''),
+    Google,
+    partial(Spider, source_urls=['spider%d' % k for k in range(4)])
+]
 
-@pytest.mark.parametrize(
-    'scraper,auth', [
-        (Twitter, ('', '', '', '')),
-        (Reddit, ('', '')),
-        (Twingly, ('',)),
-        (Google, ())
-    ]
-)
+
+@pytest.mark.parametrize('scraper', SCRAPERS)
 @pytest.mark.asyncio
-async def test_scrape(patched_aiohttp, scraper, auth):
-    scraper = scraper(*auth)
-    await scraper.scrape('query', topic='topic')
+async def test_scrape(patched_aiohttp, scraper):
+    scraper = scraper()
+    topic = '__classify__' if isinstance(scraper, Spider) else 'topic'
+    await scraper.scrape('data', topic=topic)
     await scraper.client.close()
-    assert scraper.queues['topic'].qsize() > 0, "Scraper did not get any data"
+    assert scraper.queues[topic].qsize() > 0, "Scraper did not get any data"
 
 
-@pytest.mark.parametrize(
-    'scraper,auth', [
-        (Twitter, ('', '', '', '')),
-        (Reddit, ('', '')),
-        (Twingly, ('',)),
-        (Google, ())
-    ]
-)
+@pytest.mark.parametrize('scraper', SCRAPERS)
 @pytest.mark.asyncio
-async def test_stream(patched_aiohttp, scraper, auth):
-    scraper = scraper(*auth)
+async def test_stream(patched_aiohttp, scraper):
+    scraper = scraper()
     got_item = False
-    async for item in scraper.stream('query', topic='topic'):
+    topic = '__classify__' if isinstance(scraper, Spider) else 'topic'
+    async for item in scraper.stream('data', topic=topic):
         got_item = True
         assert 'some data' in item.content, 'Did not parse correct data'
         break

@@ -54,7 +54,6 @@ _scrape_config = {
             'topic1': ['q1', 'q2']
         }
     }
-
 }
 
 
@@ -80,7 +79,7 @@ class _AGen:
         return self
 
     async def __anext__(self):
-        await asyncio.sleep(1e-5)
+        await asyncio.sleep(1e-3)
         try:
             return next(self.items)
         except StopIteration:
@@ -184,21 +183,27 @@ async def fake_request(self, method, url, **kwargs):
         elif url.startswith('https://news.google.com'):
             return _fake_requests['google']
 
-
-@contextmanager
-def _patched_aiohttp(monkeypatch):
-    saved_exit = aiohttp.client._RequestContextManager.__aexit__
-    saved_req = aiohttp.ClientSession._request
-    monkeypatch.setattr(aiohttp.ClientSession, '_request', fake_request)
-    monkeypatch.setattr(aiohttp.client._RequestContextManager,
-                        '__aexit__', RequestContextManager.__aexit__)
-
-    yield
-
-    monkeypatch.setattr(aiohttp.ClientSession,
-                        '_request', saved_req)
-    monkeypatch.setattr(aiohttp.client._RequestContextManager,
-                        '__aexit__', saved_exit)
+        elif url.startswith('spider'):
+            await asyncio.sleep(0)
+            # this needs to stay, DON'T change these values
+            # mocking an arbitrarily-deep website
+            # is complicated without this trick
+            if random.random() < 0.76:
+                return _fake_requests['http://testurl.com/stuff.html']
+            else:
+                return _resp({'text': js("""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Test</title></head><body>
+<p>Some data is a brewing, some data is a brewing!</p>
+<a href="spider%d"></a>
+<a href="spider%d"></a>
+<a href="spider%d"></a>
+<a href="spider%d"></a>
+</body></html>""" % (
+                    random.randint(0, 100000),
+                    random.randint(0, 100000),
+                    random.randint(0, 100000),
+                    random.randint(0, 100000)
+                ))})
 
 
 class TestScraper(Scraper):
@@ -261,6 +266,22 @@ class TestRedis:
 
     def lpop(self, key):
         return self.data[key].popleft()
+
+
+@contextmanager
+def _patched_aiohttp(monkeypatch):
+    saved_exit = aiohttp.client._RequestContextManager.__aexit__
+    saved_req = aiohttp.ClientSession._request
+    monkeypatch.setattr(aiohttp.ClientSession, '_request', fake_request)
+    monkeypatch.setattr(aiohttp.client._RequestContextManager,
+                        '__aexit__', RequestContextManager.__aexit__)
+
+    yield
+
+    monkeypatch.setattr(aiohttp.ClientSession,
+                        '_request', saved_req)
+    monkeypatch.setattr(aiohttp.client._RequestContextManager,
+                        '__aexit__', saved_exit)
 
 
 @pytest.fixture
@@ -374,4 +395,3 @@ def temp_config():
 def patched_redis(monkeypatch):
     monkeypatch.setattr('veryscrape.cli.Redis', TestRedis)
     yield TestRedis()
-
