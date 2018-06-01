@@ -26,7 +26,7 @@ async def test_user_agent(patched_session):
         async with klass() as sess:
             for _ in range(2):
                 async with sess.request('GET', 'user') as resp:
-                    assert (resp == 'test') == cond, 'Incorrect user agent'
+                    assert (resp._body == 'test') == cond, 'Incorrect user agent'
 
 
 @pytest.mark.asyncio
@@ -156,7 +156,7 @@ async def test_fetch(patched_aiohttp):
 async def test_fetch_stream_func(patched_aiohttp):
     data = []
     await fetch('GET', 'fstream', stream_func=lambda l: data.append(l))
-    assert data == ['test%d' % i for i in range(len(data))], \
+    assert data == [b'test%d' % i for i in range(len(data))], \
         "Did not correctly execute stream function with fetch"
 
 
