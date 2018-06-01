@@ -1,11 +1,8 @@
 from datetime import datetime
 from hashlib import md5
-from heapq import heappush, heappop
 import asyncio
 import logging
 import re
-import time
-
 log = logging.getLogger(__name__)
 
 
@@ -62,7 +59,7 @@ class ItemGenerator:
     def filter(self, text):
         if text is None:
             return False
-        hsh = md5(text.encode()).hexdigest()
+        hsh = md5(str(text).encode()).hexdigest()
         if hsh not in self.seen:
             self.seen.add(hsh)
             if len(self.seen) >= self.max_seen_items:
@@ -74,74 +71,3 @@ class ItemGenerator:
 
     def cancel(self):
         self.cancelled = True
-
-
-class ItemMerger:
-    def __init__(self, *item_gens):
-        self.q = asyncio.Queue()
-        self.item_gens = item_gens
-        self.cancelled = False
-        self.merge_future = None
-
-    async def stream(self, item_gen):
-        async for item in item_gen:
-            await self.q.put(item)
-
-    def __aiter__(self):
-        self.merge_future = asyncio.ensure_future(asyncio.gather(*[
-            self.stream(item_gen) for item_gen in self.item_gens
-        ]))
-        return self
-
-    async def __anext__(self):
-        while not self.cancelled:
-            try:
-                return self.q.get_nowait()
-            except asyncio.QueueEmpty:
-                await asyncio.sleep(1e-3)
-        raise StopAsyncIteration
-
-    def cancel(self):
-        log.debug('Cancelling item merger: SOURCES=%s - TOPICS=%s',
-                  str(set(i.source for i in self.item_gens)),
-                  str(set(i.topic for i in self.item_gens))
-                  )
-        self.cancelled = True
-        for gen in self.item_gens:
-            gen.cancel()
-        self.merge_future.cancel()
-
-
-class TimeOrderedItems:
-    def __init__(self, q, max_items=None, max_age=None):
-        self.q = q
-        self.max_items = max_items or 100
-        self.max_age = max_age or 3600
-        self.cancelled = False
-        self._heap = []
-
-    def cancel(self):
-        self.cancelled = True
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        while True:
-            if self.cancelled:
-                raise StopAsyncIteration
-            while True:
-                try:
-                    item = self.q.get_nowait()
-                except asyncio.QueueEmpty:
-                    await asyncio.sleep(0)
-                    break
-                else:
-                    heappush(self._heap, (item.created_at.timestamp(), item))
-                    await asyncio.sleep(0)
-
-            if (
-                len(self._heap) > self.max_items
-                or time.time() - self._heap[0][0] > self.max_age
-            ):
-                return heappop(self._heap)[1]

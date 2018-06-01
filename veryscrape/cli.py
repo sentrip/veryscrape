@@ -27,7 +27,7 @@ def main(conf, log_level, host, port, cores):
     # todo: add startup logging
 
     queue = asyncio.Queue()
-    scraper = VeryScrape(queue, config=conf, n_cores=cores)
+    scraper = VeryScrape(queue, n_cores=cores)
 
     db = Redis(host=host, port=port)
 
@@ -43,7 +43,7 @@ def main(conf, log_level, host, port, cores):
                 ))
     # todo: add logging
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(asyncio.gather(scraper.scrape(), push_items()))
+    loop.run_until_complete(asyncio.gather(scraper.scrape(conf), push_items()))
     loop.close()
 
     return 0

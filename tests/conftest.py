@@ -268,6 +268,24 @@ class TestRedis:
         return self.data[key].popleft()
 
 
+class TestItemGen(ItemGenerator):
+    def process_text(self, text):
+        return text[0]
+
+    def process_time(self, text):
+        return text[1]
+
+
+def _random_items():
+    n_items = 100
+    now = time.time()
+    items = []
+    for k in range(n_items):
+        items.append(Item(k, created_at=datetime.fromtimestamp(now - n_items + k)))
+    random.shuffle(items)
+    return items
+
+
 @contextmanager
 def _patched_aiohttp(monkeypatch):
     saved_exit = aiohttp.client._RequestContextManager.__aexit__
@@ -294,15 +312,17 @@ def static_data():
 
 
 @pytest.fixture
-def random_item_queue():
-    n_items = 100
-    now = time.time()
-    items = []
-    for k in range(n_items):
-        items.append(Item(k, created_at=datetime.fromtimestamp(now - n_items + k)))
-    random.shuffle(items)
+def random_item_gen():
     q = asyncio.Queue()
-    for item in items:
+    for item in _random_items():
+        q.put_nowait((item.content, item.created_at))
+    return TestItemGen(q)
+
+
+@pytest.fixture
+def random_item_queue():
+    q = asyncio.Queue()
+    for item in _random_items():
         q.put_nowait(item)
     return q
 
