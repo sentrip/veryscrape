@@ -1,4 +1,3 @@
-from concurrent.futures import ProcessPoolExecutor
 from collections import defaultdict
 from functools import partial
 import asyncio
@@ -9,15 +8,14 @@ import threading
 
 from proxybroker import Broker, ProxyPool
 
-from .items import ItemMerger
-from .process import clean_item, classify_text
+from .wrappers import ItemMerger, ItemProcessor, ItemSorter
 
 log = logging.getLogger('veryscrape')
 
 
 _mutex = threading.Lock()
 _scrapers = {}
-_scrapers_that_classify = {}
+_classifying_scrapers = {}
 
 
 def register(name, scraper, classify=False):
@@ -31,7 +29,7 @@ def register(name, scraper, classify=False):
     with _mutex:
         _scrapers[name] = scraper
         if classify:
-            _scrapers_that_classify[name] = scraper
+            _classifying_scrapers[name] = scraper
 
 
 def unregister(name):
@@ -42,28 +40,25 @@ def unregister(name):
     with _mutex:
         if name == '*':
             _scrapers.clear()
-            _scrapers_that_classify.clear()
+            _classifying_scrapers.clear()
         else:
             del _scrapers[name]
-            if name in _scrapers_that_classify:
-                del _scrapers_that_classify[name]
+            if name in _classifying_scrapers:
+                del _classifying_scrapers[name]
 
 
 class VeryScrape:
-    def __init__(self, q, config=None, loop=None, n_cores=1):
-        self.queue = q
-        self.loop = loop or asyncio.get_event_loop()
-        self.pool = ProcessPoolExecutor(n_cores)
-        self.gens = []
-        self.scrapers = []
+    def __init__(self, q,
+                 max_items_to_sort=0, max_item_age=None,
+                 loop=None, n_cores=1):
         self.items = None
-        self.using_proxies = False
+        self.loop = loop or asyncio.get_event_loop()
+        self.max_age = max_item_age
+        self.max_items = max_items_to_sort
+        self.n_cores = n_cores
+        self.queue = q
         self.topics_by_source = defaultdict(dict)
-
-        if isinstance(config, str):
-            self.load_config(config)
-        else:
-            self.config = config or {}
+        self.using_proxies = False
 
         proxy_queue = asyncio.Queue(loop=self.loop)
         self.proxies = ProxyPool(proxy_queue)
@@ -74,44 +69,61 @@ class VeryScrape:
         self.kill_event = asyncio.Event(loop=self.loop)
         self.loop.add_signal_handler(signal.SIGINT, self.close)
 
-    def load_config(self, path):
-        with open(path, 'r') as f:
-            self.config = json.load(f)
-
     def close(self):
         self.kill_event.set()
         if self.items is not None:
             self.items.cancel()
         self.proxy_broker.stop()
-        self.pool.shutdown()
 
-    async def scrape(self):
-        self._setup()
-        self.items = ItemMerger(*[gen() for gen in self.gens])
+    def create_all_scrapers_and_streams(self, config):
+        scrapers = []
+        streams = []
+        for source, auth_topics in config.copy().items():
+            for auth, metadata in auth_topics.items():
 
+                args, kwargs = self._create_args_kwargs(auth, metadata)
+
+                scraper, _streams = self._create_single_scraper_and_streams(
+                    metadata, _scrapers[source], args, kwargs
+                )
+
+                self.topics_by_source[source].update(metadata)
+                scrapers.append(scraper)
+                streams.extend(_streams)
+
+        return scrapers, streams
+
+    async def scrape(self, config=None):
+        if isinstance(config, str):
+            with open(config, 'r') as f:
+                config = json.load(f)
+        else:
+            config = config or {}
+
+        try:
+            scrapers, streams = self.create_all_scrapers_and_streams(config)
+        except Exception as e:
+            raise ValueError().with_traceback(e.__traceback__)
+
+        self.items = ItemSorter(
+            ItemProcessor(
+                ItemMerger(*[
+                    stream() for stream in streams
+                ]), n_cores=self.n_cores, loop=self.loop
+            ), max_items=self.max_items, max_age=self.max_age
+        )
+
+        # Update topics of ItemProcessor
+        self.items.items.update_topics(**self.topics_by_source)
+
+        # Start finding proxies if any scrapers use proxies
         if self.using_proxies:
             asyncio.ensure_future(self._update_proxies())
 
         async for item in self.items:
-            future = self.loop.run_in_executor(self.pool, clean_item, item)
-            if item.topic == '__classify__':
-                future.add_done_callback(self._classify_item)
-            else:
-                future.add_done_callback(self._enqueue_item)
+            await self.queue.put(item)
 
-        await asyncio.gather(*[s.close() for s in self.scrapers])
-
-    def _setup(self):
-        try:
-            for source, auths in self.config.copy().items():
-                for auth, metadata in auths.items():
-                    args, kwargs = self._create_args_kwargs(auth, metadata)
-                    self.topics_by_source[source].update(metadata)
-                    self._create_scraper(
-                        metadata, _scrapers[source], args, kwargs)
-
-        except Exception as e:
-            raise ValueError('INCORRECT CONFIG - raised %s' % repr(e))
+        await asyncio.gather(*[s.close() for s in scrapers])
 
     def _create_args_kwargs(self, auth, metadata):
         args = []
@@ -128,39 +140,17 @@ class VeryScrape:
 
         return args, kwargs
 
-    def _create_scraper(self, topics, klass, args, kwargs):
+    @staticmethod
+    def _create_single_scraper_and_streams(topics, klass, args, kwargs):
+        streams = []
         scraper = klass(*args, **kwargs)
-        self.scrapers.append(scraper)
         for topic, queries in topics.items():
-            for q in queries:
-                if klass in _scrapers_that_classify.values():
-                    topic = '__classify__'
-                self.gens.append(
-                    partial(scraper.stream, q, topic=topic)
-                )
-
-    def _classify_item(self, future):
-        if not future.cancelled() and not future.exception():
-            item = future.result()
-            f = self.pool.submit(
-                classify_text,
-                item.content, self.topics_by_source[item.source]
-            )
-            f.add_done_callback(partial(
-                self._enqueue_classified_item, item=item))
-
-    def _enqueue_classified_item(self, future, item=None):
-        if not future.cancelled() and not future.exception():
-            if item is not None:
-                item.topic = future.result()
-                log.debug('Queuing cleaned and classified item: %s', str(item))
-                self.queue.put_nowait(item)
-
-    def _enqueue_item(self, future):
-        if not future.cancelled() and not future.exception():
-            result = future.result()
-            log.debug('Queuing cleaned item: %s', str(result))
-            self.queue.put_nowait(result)
+            if klass in _classifying_scrapers.values():
+                topic = '__classify__'
+            streams.extend([
+                partial(scraper.stream, q, topic=topic) for q in queries
+            ])
+        return scraper, streams
 
     async def _update_proxies(self):
         while not self.kill_event.is_set():
@@ -172,3 +162,4 @@ class VeryScrape:
                     'https://httpbin.org/get?show_env'
                 ]
             )
+            await asyncio.sleep(180)  # default proxy-broker sleep cycle
