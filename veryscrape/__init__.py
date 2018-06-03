@@ -3,7 +3,7 @@ from .veryscrape import VeryScrape, register, unregister
 
 __author__ = """Djordje Pepic"""
 __email__ = 'djordje.m.pepic@gmail.com'
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 register('twitter', Twitter)
 register('reddit', Reddit)
