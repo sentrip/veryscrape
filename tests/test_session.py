@@ -1,6 +1,6 @@
 import time
 import pytest
-from veryscrape.session import fetch
+from veryscrape.session import FetchError
 
 
 @pytest.mark.asyncio
@@ -101,7 +101,7 @@ async def test_oauth1(patched_oauth1):
 async def test_oauth1_request(patched_oauth1):
     async with patched_oauth1('', '', '', '') as sess:
         sess.base_url = 'http://testurl.com/'
-        res = await fetch('GET', 'stuff.html', session=sess, params={})
+        res = await sess.fetch('GET', 'stuff.html', params={})
         assert res.startswith('<!doctype'), \
             'Did not correctly request with base url'
 
@@ -147,35 +147,36 @@ async def test_oauth2_token_exists_expired(patched_oauth2):
 
 
 @pytest.mark.asyncio
-async def test_fetch(patched_aiohttp):
-    res = await fetch('GET', 'fetch')
-    assert res == 'test', 'Did not get correct data with fetch'
-
-
-@pytest.mark.asyncio
-async def test_fetch_stream_func(patched_aiohttp):
-    data = []
-    await fetch('GET', 'fstream', stream_func=lambda l: data.append(l))
-    assert data == [b'test%d' % i for i in range(len(data))], \
-        "Did not correctly execute stream function with fetch"
-
-
-@pytest.mark.asyncio
-async def test_fetch_http_error(patched_aiohttp):
-    res = await fetch('GET', 'error')
-    assert res is '', 'Returned data for failed request'
-
-
-@pytest.mark.asyncio
-async def test_fetch_http_exception(patched_aiohttp):
-    res = await fetch('GET', 'exception')
-    assert res is '', 'Returned data for failed request'
-
-
-@pytest.mark.asyncio
-async def test_fetch_custom_session(patched_session):
+async def test_fetch(patched_session):
     async with patched_session() as sess:
-        res = await fetch('GET', 'fetch', session=sess)
+        res = await sess.fetch('GET', 'fetch')
         assert res == 'test', 'Did not get correct data with fetch'
-        assert not sess.closed, "Closed session passed into fetch"
+
+
+@pytest.mark.asyncio
+async def test_fetch_stream_func(patched_session):
+    data = []
+    async with patched_session() as sess:
+        await sess.fetch('GET', 'fstream', stream_func=lambda l: data.append(l))
+        assert data == [b'test%d' % i for i in range(len(data))], \
+            "Did not correctly execute stream function with fetch"
+
+
+# Ignore DeprecationWarning cause by aiohttp in python 3.5
+@pytest.mark.filterwarnings('ignore::DeprecationWarning')
+@pytest.mark.asyncio
+async def test_fetch_http_error(patched_session):
+    async with patched_session() as sess:
+        sess.retries_to_error = 0
+        with pytest.raises(FetchError):
+            await sess.fetch('GET', 'error')
+
+
+@pytest.mark.asyncio
+async def test_fetch_http_exception(patched_session):
+    async with patched_session() as sess:
+        sess.retries_to_error = 0
+        sess.error_on_failure = False
+        res = await sess.fetch('GET', 'exception')
+        assert res is '', 'Returned data for failed request'
 

@@ -1,7 +1,7 @@
 from aioauth_client import HmacSha1Signature
 from aiohttp.client import _RequestContextManager
 from collections import OrderedDict
-from fake_useragent import UserAgent, settings, FakeUserAgentError
+from fake_useragent import UserAgent, settings
 from hashlib import sha1
 from time import time
 from random import SystemRandom
@@ -17,10 +17,8 @@ random = SystemRandom().random
 # If fake_useragent can't connect then this allows it to finish early
 settings.HTTP_DELAY = 0.01
 settings.HTTP_RETRIES = 1
-try:
-    _agent_factory = UserAgent()
-except FakeUserAgentError:  # pragma: nocover
-    _agent_factory = type('', (), {'random': 'no-agent'})
+settings.HTTP_TIMEOUT = 0.1
+_agent_factory = UserAgent(fallback='python:veryscrape')
 
 
 def _create_nested_metadata(parent):
@@ -166,10 +164,14 @@ class Session:
     persist_user_agent = True
     user_agent = None
 
-    def __init__(self, proxy_pool=None):
+    error_on_failure = True    # Is FetchError raised when Session.fetch fails
+    retries_to_error = 5       # Number of retries before failing
+    sleep_increment = 15       # Time to sleep between failed requests
+
+    def __init__(self, *args, proxy_pool=None, **kwargs):
         self.limiter = RateLimiter(self.rate_limits, self.rate_limit_period)
         self._pool = proxy_pool
-        self._session = aiohttp.ClientSession()
+        self._session = aiohttp.ClientSession(**kwargs)
         # This is so you can call get, post, etc... without having to recode
         # aiohttp uses _request internally for everything, so that is saved,
         # and calls to aiohttp's _request are sent to _request of this class,
@@ -219,6 +221,61 @@ class Session:
     def request(self, method, url, **kwargs):
         return _RequestContextManager(self._request(method, url, **kwargs))
 
+    async def fetch(self, method, url, *,
+                    params=None, stream_func=None, **kwargs):
+
+        result = ''
+        count = 0
+        success = False
+        kwargs.update(params=params, timeout=kwargs.pop('timeout', 10))
+
+        while not success and count <= self.retries_to_error:
+            async with self.request(method, url, **kwargs) as resp:
+                try:
+                    try:
+                        resp.raise_for_status()
+
+                    except asyncio.TimeoutError:
+                        await asyncio.sleep(count * self.sleep_increment)
+
+                    except aiohttp.ClientResponseError:
+                        try:
+                            error_text = await resp.text()
+                        except Exception as e:
+                            error_text = repr(e)
+
+                        log.error('ERROR %d requesting %-20s - %20s',
+                                  resp.status, url, error_text[:20])
+                        await self.on_error(resp.status)
+
+                    else:
+                        if stream_func is not None:
+                            async for line in resp.content:
+                                stream_func(line)
+                        else:
+                            result = await resp.text()
+
+                        success = True
+
+                except Exception as e:
+                    log.error("EXCEPTION requesting %-20s: %20s",
+                              url, repr(e)[:20])
+                    await asyncio.sleep(count * self.sleep_increment)
+
+            count += 1
+
+        if not success and self.error_on_failure:
+            raise FetchError
+
+        return result
+
+    async def on_error(self, error_code):
+        """
+        This is called when a request returns a non-200 status code.
+        :param error_code: status code of http request
+        """
+        return
+
 
 class OAuth1Session(Session):
     base_url = None
@@ -243,34 +300,8 @@ class OAuth2Session(OAuth1Session):
     _patcher = OAuth2
 
 
-async def fetch(method, url, *, params=None,
-                session=None, stream_func=None, **kwargs):
-    if session is None:
-        sess = aiohttp.ClientSession()
-    else:
-        sess = session
-    result = ''
-    timeout = kwargs.pop('timeout', 10)
-    kwargs.update(params=params, timeout=timeout)
-    async with sess.request(method, url, **kwargs) as resp:
-        try:
-            resp.raise_for_status()
-            if stream_func is not None:
-                async for line in resp.content:
-                    stream_func(line)
-                    await asyncio.sleep(0)
-            else:
-                result = await resp.text()
-        except aiohttp.ClientResponseError:
-            error_text = await resp.text()
-            log.error(
-                'ERROR %d requesting %-30s - %s', resp.status, url,
-                error_text[:100].replace('\n', '')
-            )
-        except Exception as e:
-            log.exception("ERROR requesting %-30s: %s", url, repr(e))
-
-    if session is None:
-        await sess.close()
-
-    return result
+class FetchError(Exception):
+    """
+    Exception raised when a fetch request fails despite retries
+    This is used for flow control of circuit-breaker logic in Scraper
+    """

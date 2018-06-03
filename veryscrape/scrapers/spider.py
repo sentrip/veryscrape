@@ -2,7 +2,6 @@ import asyncio
 
 from .google import extract_urls
 from ..items import ItemGenerator
-from ..session import fetch, Session
 from ..scrape import Scraper
 
 
@@ -18,8 +17,8 @@ class Spider(Scraper):
     item_gen = SpiderItemGen
     concurrent_requests = 200
 
-    def __init__(self, *args, source_urls=(), proxy_pool=None):
-        super(Spider, self).__init__(Session, *args, proxy_pool=proxy_pool)
+    def __init__(self, *args, source_urls=(), proxy_pool=None, **kwargs):
+        super(Spider, self).__init__(*args, proxy_pool=proxy_pool, **kwargs)
         self.loop = asyncio.get_event_loop()
         self.source_urls = source_urls
         self.seen_urls = set()
@@ -43,7 +42,7 @@ class Spider(Scraper):
         while len(self._futures) > self.concurrent_requests:
             await asyncio.sleep(1e-3)
 
-        future = asyncio.ensure_future(fetch('GET', url, session=self.client))
+        future = asyncio.ensure_future(self.client.fetch('GET', url))
         future.add_done_callback(self._fetch_callback)
         self._futures.add(future)
 

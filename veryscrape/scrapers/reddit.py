@@ -2,8 +2,14 @@ from datetime import datetime
 import json
 
 from ..items import ItemGenerator
-from ..session import OAuth2Session, fetch
+from ..session import OAuth2Session
 from ..scrape import Scraper
+
+
+class RedditSession(OAuth2Session):
+    base_url = 'https://oauth.reddit.com/r/'
+    user_agent = 'python:veryscrape:v0.1.0 (by /u/jayjay)'
+    persist_user_agent = True
 
 
 class CommentGen(ItemGenerator):
@@ -20,34 +26,31 @@ class CommentGen(ItemGenerator):
 
 class Reddit(Scraper):
     source = 'reddit'
+    scrape_every = 600
     item_gen = CommentGen
-    scrape_every = 60
+    session_class = RedditSession
 
     def __init__(self, key, secret, *, proxy_pool=None):
         super(Reddit, self).__init__(
-            OAuth2Session, key, secret,
-            'https://www.reddit.com/api/v1/access_token',
+            key, secret, 'https://www.reddit.com/api/v1/access_token',
             proxy_pool=proxy_pool
         )
-        self.client.base_url = 'https://oauth.reddit.com/r/'
-        self.client.user_agent = 'python:veryscrape:v0.0.3 (by /u/jayjay)'
-        self.client.persist_user_agent = True
 
     async def get_links(self, query):
-        res = await fetch('GET', '%s/hot.json' % query,
-                          session=self.client,
-                          params={'raw_json': 1, 'limit': 100}
-                          )
+        res = await self.client.fetch(
+            'GET', '%s/hot.json' % query,
+            params={'raw_json': 1, 'limit': 100}
+        )
         res = json.loads(res or '[]')
         if isinstance(res, dict) and 'data' in res:
             return [i['data']['id'] for i in res['data']['children']]
         return []
 
     async def get_comments(self, query, link):
-        res = await fetch('GET', '%s/comments/%s.json' % (query, link),
-                          session=self.client,
-                          params={'raw_json': 1, 'limit': 10000, 'depth': 10}
-                          )
+        res = await self.client.fetch(
+            'GET', '%s/comments/%s.json' % (query, link),
+            params={'raw_json': 1, 'limit': 10000, 'depth': 10}
+        )
         res = json.loads(res or '[]')
         if isinstance(res, list):
             return [(c['data']['body'], c['data']['created_utc'])
