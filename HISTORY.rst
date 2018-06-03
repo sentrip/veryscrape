@@ -12,3 +12,9 @@ History
 ------------------
 
 * Refactored VeryScrape and Scraper
+
+
+0.1.2 (2018-06-03)
+------------------
+
+* Fixed bug in ItemSorter
