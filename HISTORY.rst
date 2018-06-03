@@ -6,3 +6,9 @@ History
 ------------------
 
 * First release on PyPI.
+
+
+0.1.1 (2018-06-03)
+------------------
+
+* Refactored VeryScrape and Scraper
