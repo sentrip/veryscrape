@@ -3,7 +3,6 @@ sys.path.append(os.path.abspath('../veryscrape'))
 from contextlib import contextmanager
 from collections import defaultdict, deque
 from datetime import datetime
-from functools import partial
 import asyncio
 import aiohttp
 import json
@@ -64,7 +63,9 @@ class FakeResponse:
 
     def raise_for_status(self):
         if self.status != 200:
-            raise aiohttp.ClientResponseError({}, [], status=200)
+            err = aiohttp.ClientResponseError({}, [])
+            err.status = err.code = self.status
+            raise err
 
 
 class FakeInternet:
@@ -253,6 +254,7 @@ def patched_aiohttp(monkeypatch):
 @pytest.fixture
 def patched_session(monkeypatch):
     with _patched_aiohttp(monkeypatch):
+        monkeypatch.setattr('veryscrape.session.Session.sleep_increment',  0)
         yield veryscrape.session.Session
 
 
@@ -270,26 +272,26 @@ def patched_oauth2(monkeypatch):
 
 @pytest.fixture
 def scraper():
-    return partial(TestScraper, veryscrape.session.Session)
+    return TestScraper
 
 
 @pytest.fixture
 def html_scraper(request):
     # this injection is a bit messy
-    old_fetch = veryscrape.scrape.fetch
+    old_fetch = veryscrape.session.Session.fetch
 
-    async def _add(method, url, **kwargs):
+    async def _add(self, method, url, **kwargs):
         TestHTMLScraper.calls.append((method, url, kwargs))
         if url == 'urls':
             return 'http://example.com\nhttps://example.com'
         else:
             return '<html>stuff%d</html>' % len(TestHTMLScraper.calls)
-    veryscrape.scrape.fetch = _add
+    veryscrape.session.Session.fetch = _add
     request.addfinalizer(TestHTMLScraper.calls.clear)
 
-    yield partial(TestHTMLScraper, veryscrape.session.Session)
+    yield TestHTMLScraper
 
-    veryscrape.scrape.fetch = old_fetch
+    veryscrape.session.Session.fetch = old_fetch
 
 
 @pytest.fixture

@@ -11,7 +11,12 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=6.0', ]
+requirements = [
+    'Click>=6.0', 'aiohttp>=2.3.10', 'lxml>=3.5.0', 'async_timeout==2.0.0',
+    'aioauth_client>=0.8.0', 'fake_useragent>=0.1.10', 'newspaper3k>=0.2.6',
+    'twingly_search>=2.1.1', 'deprecation>=2.0.2', 'proxybroker>=0.3.1',
+    'redis>=2.10.6'
+]
 
 setup_requirements = ['pytest-runner', ]
 
@@ -25,10 +30,6 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Natural Language :: English',
-        "Programming Language :: Python :: 2",
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
     ],
@@ -44,7 +45,7 @@ setup(
     include_package_data=True,
     keywords='veryscrape',
     name='veryscrape',
-    packages=find_packages(include=['veryscrape']),
+    packages=find_packages(include=['veryscrape', 'veryscrape.scrapers']),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,

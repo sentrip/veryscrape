@@ -1,6 +1,11 @@
 from ..process import extract_urls
-from ..session import Session
 from ..scrape import SearchEngineScraper, ItemGenerator
+from ..session import Session
+
+
+class GoogleSession(Session):
+    error_on_failure = False
+    retries_to_error = 2
 
 
 class ArticleGen(ItemGenerator):
@@ -14,9 +19,7 @@ class ArticleGen(ItemGenerator):
 class Google(SearchEngineScraper):
     source = 'article'
     item_gen = ArticleGen
-
-    def __init__(self, *, proxy_pool=None):
-        super(Google, self).__init__(Session, proxy_pool=proxy_pool)
+    session_class = GoogleSession
 
     def query_string(self, query):
         return 'https://news.google.com/news/search/section/q/' \
