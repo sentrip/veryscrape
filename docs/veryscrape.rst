@@ -59,6 +59,14 @@ veryscrape.veryscrape module
     :undoc-members:
     :show-inheritance:
 
+veryscrape.wrappers module
+--------------------------
+
+.. automodule:: veryscrape.wrappers
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 
 Module contents
 ---------------

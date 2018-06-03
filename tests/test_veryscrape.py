@@ -9,7 +9,7 @@ from veryscrape import VeryScrape, register, unregister
 @pytest.mark.asyncio
 async def test_setup_correct_config(scrape_config):
     vs = VeryScrape(asyncio.Queue())
-    scrapers, streams = vs.create_all_scrapers_and_streams(scrape_config)
+    scrapers, streams, _ = vs.create_all_scrapers_and_streams(scrape_config)
     assert len(scrapers) == len(scrape_config), 'Did not add all scrapers'
     assert len(streams) == len(scrapers) * 2, 'Did not add 2 streams per scraper'
 
@@ -36,7 +36,7 @@ async def test_scrape(patched_aiohttp, scrape_config):
         vs.close()
 
     await asyncio.gather(
-        vs.scrape(scrape_config), wait_for_items(), return_exceptions=True
+        vs.scrape(scrape_config, max_age=1e-6), wait_for_items(), return_exceptions=True
     )
 
     while not q.empty():
@@ -96,7 +96,7 @@ async def test_scrape_with_proxies(patched_aiohttp, patched_proxy_pool, scrape_c
 @pytest.mark.asyncio
 async def test_scrape_multi_core(patched_aiohttp, scrape_config):
     q = asyncio.Queue()
-    vs = VeryScrape(q, n_cores=2)
+    vs = VeryScrape(q)
 
     async def wait_for_items():
         while q.qsize() < 4:
@@ -104,7 +104,7 @@ async def test_scrape_multi_core(patched_aiohttp, scrape_config):
         vs.close()
 
     await asyncio.gather(
-        vs.scrape(scrape_config), wait_for_items(), return_exceptions=True
+        vs.scrape(scrape_config, n_cores=2), wait_for_items(), return_exceptions=True
     )
 
     while not q.empty():
@@ -127,7 +127,7 @@ async def test_register():
     config = {'test': {'': {'topic': ['stuff']}}}
     q = asyncio.Queue()
     vs = VeryScrape(q)
-    scrapers, _ = vs.create_all_scrapers_and_streams(config)
+    scrapers, *_ = vs.create_all_scrapers_and_streams(config)
     assert len(scrapers) == 1, 'Did not register new scraper'
 
 
