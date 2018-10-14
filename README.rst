@@ -7,7 +7,7 @@ veryscrape
         :target: https://pypi.python.org/pypi/veryscrape
 
 .. image:: https://img.shields.io/travis/sentrip/veryscrape.svg
-        :target: https://travis-ci.org/sentrip/veryscrape
+        :target: https://travis-ci.com/sentrip/veryscrape
 
 .. image:: https://readthedocs.org/projects/veryscrape/badge/?version=latest
         :target: https://veryscrape.readthedocs.io/en/latest/?badge=latest
